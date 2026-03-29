@@ -137,6 +137,68 @@ systemctl --user --now enable pipewire pipewire-pulse wireplumber
 
 ---
 
+## 6. Mounting Additional Disks (Including NTFS)
+
+To mount other disks (such as additional internal drives, external USB drives, or Windows NTFS partitions), follow these steps:
+
+### Install Required Tools
+
+For NTFS and exFAT support, install the following packages:
+
+```bash name=11-filesystem-tools.sh
+sudo apt install ntfs-3g exfat-fuse exfat-utils -y
+```
+
+### Identify the Disk/Partition
+
+List all disks and partitions:
+
+```bash
+lsblk -f
+```
+
+Look for the device name (e.g., `/dev/sdb1`) and filesystem type (e.g., `ntfs`, `ext4`, `exfat`).
+
+### Mount the Disk Temporarily
+
+Create a mount point and mount the disk (replace `/dev/sdXN` and `/mnt/mydisk` as needed):
+
+```bash
+sudo mkdir -p /mnt/mydisk
+sudo mount -t auto /dev/sdXN /mnt/mydisk
+```
+
+For NTFS specifically, you can use:
+
+```bash
+sudo mount -t ntfs-3g /dev/sdXN /mnt/mydisk
+```
+
+### Mount the Disk Automatically at Boot
+
+To mount the disk automatically, add an entry to `/etc/fstab`. First, get the UUID:
+
+```bash
+sudo blkid /dev/sdXN
+```
+
+Add a line to `/etc/fstab` (replace UUID and filesystem type as needed):
+
+```text name=/etc/fstab
+UUID=xxxx-xxxx   /mnt/mydisk   ntfs-3g   defaults,uid=1000,gid=1000,umask=022   0   0
+```
+
+For ext4 or exFAT, adjust the type and options accordingly:
+
+```text
+UUID=xxxx-xxxx   /mnt/mydisk   ext4      defaults   0   2
+UUID=xxxx-xxxx   /mnt/mydisk   exfat     defaults,uid=1000,gid=1000,umask=022   0   0
+```
+
+> **Tip:** Replace `uid=1000,gid=1000` with your user/group ID if different. Use `id $USER` to check.
+
+---
+
 ## Troubleshooting & tips
 - If graphics are not working, check `journalctl -b` and `dmesg` for firmware errors.
 - For missing firmware packages, enable the `non-free`/`contrib` sections and run `sudo apt update` again.
