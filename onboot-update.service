@@ -1,0 +1,20 @@
+[Unit]
+Description=12-Hour Debounced On-Boot System Updater
+Documentation=man:apt(8)
+# Crucial: Wait for the network stack to actually have connectivity
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/onboot-update.sh
+# Run with minimal CPU/IO priority so it doesn't slow down your desktop login
+Nice=19
+IOSchedulingClass=idle
+# Security hardening
+ProtectSystem=strict
+ReadWritePaths=/var/lib/local-updates /var/cache/apt /var/lib/apt /var/lib/dpkg /var/log/apt
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
