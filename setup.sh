@@ -52,7 +52,7 @@ echo ">> Installing core packages..."
 sudo apt-get install -y \
     firmware-amd-graphics libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers \
     xserver-xorg-video-amdgpu firmware-realtek \
-    bluez blueman ddcutil playerctl git \
+    bluez ddcutil playerctl git \
     seatd foot bemenu \
     pipewire pipewire-audio pipewire-pulse wireplumber \
     gnome-keyring libsecret-1-0 libsecret-tools libpam-gnome-keyring \
