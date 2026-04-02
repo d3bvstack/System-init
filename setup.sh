@@ -52,7 +52,7 @@ echo ">> Installing core packages..."
 sudo apt-get install -y \
     firmware-amd-graphics libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers \
     xserver-xorg-video-amdgpu firmware-realtek \
-    bluez ddcutil playerctl git \
+    bluez bluetooth bluez-tools ddcutil playerctl git \
     seatd foot bemenu \
     pipewire pipewire-audio pipewire-pulse wireplumber \
     gnome-keyring libsecret-1-0 libsecret-tools libpam-gnome-keyring \
@@ -61,6 +61,7 @@ sudo apt-get install -y \
 # 5. System Services and Group Management
 echo ">> Enabling system services and configuring groups..."
 sudo systemctl enable --now bluetooth seatd
+sudo group add seat
 sudo usermod -aG video,render,seat "$ACTUAL_USER"
 
 # 6. Pipewire User Configuration
@@ -75,9 +76,9 @@ echo ">> Configuring PAM for Gnome Keyring..."
 sudo pam-auth-update --enable gnome-keyring
 
 # Idempotent append to .profile
-if ! grep -q "gnome-keyring-daemon" "$ACTUAL_HOME/.profile" 2>/dev/null; then
-    echo ">> Adding Keyring Daemon to $ACTUAL_HOME/.profile..."
-    cat << 'EOF' >> "$ACTUAL_HOME/.profile"
+# if ! grep -q "gnome-keyring-daemon" "$ACTUAL_HOME/.profile" 2>/dev/null; then
+#    echo ">> Adding Keyring Daemon to $ACTUAL_HOME/.profile..."
+#    cat << 'EOF' >> "$ACTUAL_HOME/.profile"
 
 # Start Gnome Keyring Daemon
 if [ -n "$IS_TTY" ] || [ -z "$GRAPHICAL_SESSION" ]; then
