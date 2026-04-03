@@ -5,14 +5,14 @@
 set -Eeuo pipefail
 
 # 1. Determine the primary user (for ownership and NTFS UID mapping)
-if[ -n "${SUDO_USER:-}" ]; then
+if [ -n "${SUDO_USER:-}" ]; then
     ACTUAL_USER="$SUDO_USER"
 else
     ACTUAL_USER="$USER"
 fi
 
 # Ensure we don't accidentally map permissions to the root user
-if[ "$ACTUAL_USER" = "root" ]; then
+if [ "$ACTUAL_USER" = "root" ]; then
     echo "ERROR: Please run this script with sudo from a normal user account, not as root directly."
     exit 1
 fi
@@ -31,7 +31,7 @@ echo ">> Backup of /etc/fstab created."
 lsblk -n -r -o NAME,FSTYPE,UUID,LABEL,MOUNTPOINT | while read -r DEV FSTYPE UUID LABEL MOUNTPOINT; do
     
     # Skip if it doesn't have a UUID or is already mounted (like your root partition)
-    if[ -z "$UUID" ] || [ -n "$MOUNTPOINT" ]; then
+    if [ -z "$UUID" ] || [ -n "$MOUNTPOINT" ]; then
         continue
     fi
 

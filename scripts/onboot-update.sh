@@ -16,7 +16,7 @@ TIMEOUT_MINUTES=720 # 12 hours
 mkdir -p "$STAMP_DIR"
 
 # Check if the timestamp file exists and was modified within the last 12 hours
-if[ -f "$STAMP_FILE" ]; then
+if [ -f "$STAMP_FILE" ]; then
     # Find will output the filename if it was modified less than TIMEOUT_MINUTES ago
     RECENT_RUN=$(find "$STAMP_FILE" -mmin -"$TIMEOUT_MINUTES" 2>/dev/null)
     if [ -n "$RECENT_RUN" ]; then

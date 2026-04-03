@@ -50,8 +50,8 @@ sudo apt-get full-upgrade -y
 # 4. Install Hardware, Firmware, and Core Packages
 echo ">> Installing core packages..."
 sudo apt-get install -y \
-    firmware-amd-graphics libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers \
-    xserver-xorg-video-amdgpu firmware-realtek \
+    firmware-amd-graphics libgl1-mesa-dri libglx-mesa0 mesa-utils mesa-vulkan-drivers \
+    firmware-realtek \
     bluez bluetooth bluez-tools ddcutil playerctl git \
     seatd foot bemenu \
     pipewire pipewire-audio pipewire-pulse wireplumber \
