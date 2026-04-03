@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
+# Purpose: Install Docker Engine from Docker's Debian repository.
 
+# Exit on errors, unset variables, and pipeline failures.
 set -Eeuo pipefail
 
+# Prevent apt from opening interactive prompts.
 export DEBIAN_FRONTEND=noninteractive
 
+# Require root privileges because this script modifies system package sources.
 if [[ "$EUID" -ne 0 ]]; then
     echo "ERROR: Please run this script with sudo or as root."
     exit 1
 fi
 
+# Read distro metadata to choose the correct Debian suite.
 if [[ ! -r /etc/os-release ]]; then
     echo "ERROR: Cannot read /etc/os-release to determine the Debian codename."
     exit 1
@@ -26,16 +31,19 @@ KEYRING_DIR="/etc/apt/keyrings"
 KEYRING_PATH="$KEYRING_DIR/docker.asc"
 SOURCE_PATH="/etc/apt/sources.list.d/docker.sources"
 
+# Install tools required to add Docker's repository key and source.
 echo ">> Installing prerequisites for Docker repository setup..."
 apt-get update
 apt-get install -y ca-certificates curl
 
+# Create the standard apt keyring directory with expected permissions.
 install -d -m 0755 "$KEYRING_DIR"
 
 echo ">> Downloading Docker repository key..."
 curl -fsSL https://download.docker.com/linux/debian/gpg -o "$KEYRING_PATH"
 chmod a+r "$KEYRING_PATH"
 
+# Write a deb822 source entry for this architecture and suite.
 echo ">> Configuring Docker apt repository for suite: $VERSION_CODENAME"
 cat > "$SOURCE_PATH" <<EOF
 Types: deb
@@ -46,11 +54,13 @@ Architectures: $ARCHITECTURE
 Signed-By: $KEYRING_PATH
 EOF
 
+# Refresh package metadata after adding the Docker repository.
 apt-get update
 
 echo ">> Installing Docker packages..."
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
+# Report current Docker service state.
 if systemctl is-active docker >/dev/null 2>&1; then
     echo ">> Docker service is active."
 else

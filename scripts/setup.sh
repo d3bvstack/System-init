@@ -1,17 +1,13 @@
 #!/usr/bin/env bash
+# Purpose: Configure a Debian Trixie workstation with core packages and services.
 
-# -----------------------------------------------------------------------------
-# Debian Trixie Post-Installation Script
-# -----------------------------------------------------------------------------
-
-# Fail on error, fail on unset vars, fail on pipeline errors
+# Exit on errors, unset variables, and pipeline failures.
 set -Eeuo pipefail
 
-# Force APT into non-interactive mode so it doesn't hang on prompts
+# Prevent apt from opening interactive prompts.
 export DEBIAN_FRONTEND=noninteractive
 
-# 1. Determine User Execution Context
-# Ensure we apply configurations to the actual human user, even if run via sudo
+# Resolve the target non-root user, even when the script is run via sudo.
 if [ -n "${SUDO_USER:-}" ]; then
     ACTUAL_USER="$SUDO_USER"
     ACTUAL_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
@@ -24,9 +20,8 @@ fi
 
 echo ">> Applying user configurations for: $ACTUAL_USER"
 
-# 2. Configure APT Sources (Trixie)
-# Note: Enabling 'non-free' and 'non-free-firmware' violates strict DFSG, 
-# but is required for AMD GPUs and certain Wi-Fi cards.
+# Configure Debian Trixie apt sources.
+# Note: non-free sections are required for some GPU and Wi-Fi firmware.
 echo ">> Configuring Trixie Repositories..."
 cat <<EOF | sudo tee /etc/apt/sources.list > /dev/null
 # Trixie Main Repos
@@ -42,12 +37,12 @@ deb http://deb.debian.org/debian/ trixie-updates main contrib non-free-firmware 
 deb-src http://deb.debian.org/debian/ trixie-updates main contrib non-free-firmware non-free
 EOF
 
-# 3. System Upgrade
+# Update package metadata and apply a full upgrade.
 echo ">> Updating package cache and performing full upgrade..."
 sudo apt-get update
 sudo apt-get full-upgrade -y
 
-# 4. Install Hardware, Firmware, and Core Packages
+# Install core firmware, desktop, audio, and utility packages.
 echo ">> Installing core packages..."
 sudo apt-get install -y \
     firmware-amd-graphics libgl1-mesa-dri libglx-mesa0 mesa-utils mesa-vulkan-drivers \
@@ -58,31 +53,30 @@ sudo apt-get install -y \
     gnome-keyring libsecret-1-0 libsecret-tools libpam-gnome-keyring \
     wget gpg apt-transport-https
 
-# 5. System Services and Group Management
+# Enable required services and add user group memberships.
 echo ">> Enabling system services and configuring groups..."
 sudo systemctl enable --now bluetooth seatd
 sudo group add seat
 sudo usermod -aG video,render,seat "$ACTUAL_USER"
 
-# 6. Pipewire User Configuration
-# Safely executing user-level systemctl commands by passing XDG_RUNTIME_DIR
+# Enable user-level PipeWire services by setting the user's runtime directory.
 echo ">> Enabling Pipewire for user $ACTUAL_USER..."
 sudo -u "$ACTUAL_USER" XDG_RUNTIME_DIR="/run/user/$ACTUAL_UID" \
     systemctl --user enable --now pipewire pipewire-pulse wireplumber
 
-# 7. PAM and Keyring Integration (The Debian Way)
+# Enable GNOME Keyring integration through Debian PAM tooling.
 echo ">> Configuring PAM for Gnome Keyring..."
-# 'pam-auth-update' is the Debian-standard way to manage /etc/pam.d/ configurations
+# Use Debian's managed PAM interface instead of editing /etc/pam.d files directly.
 sudo pam-auth-update --enable gnome-keyring
-# Keep shell profiles untouched here; keyring startup is delegated to PAM/session components.
+# Keep shell profiles unchanged; keyring startup is handled by PAM sessions.
 
-# 8. Visual Studio Code Installation
+# Install VS Code Insiders from Microsoft's apt repository.
 echo ">> Installing VS Code..."
-# Stream the key directly to the correct location without temporary files
+# Stream the repository key directly to the target keyring file.
 wget -qO- https://packages.microsoft.com/keys/microsoft.asc | \
     gpg --dearmor | sudo tee /usr/share/keyrings/microsoft.gpg > /dev/null
 
-# Ensure strict FHS permissions on the GPG key
+# Ensure apt can read the repository key.
 sudo chmod 644 /usr/share/keyrings/microsoft.gpg
 
 cat <<EOF | sudo tee /etc/apt/sources.list.d/vscode.sources > /dev/null
@@ -97,12 +91,12 @@ EOF
 sudo apt-get update
 sudo apt-get install code-insiders -y
 
-# 9. Final Cleanup
+# Remove no-longer-needed packages and clean apt cache.
 echo ">> Cleaning up..."
 sudo apt-get autoremove --purge -y
 sudo apt-get clean
 
-# WARNING: Destructive command ahead
+# Reboot after a short delay so the new system state is applied.
 echo "======================================================="
 echo "Setup complete. The system requires a reboot."
 echo "Rebooting in 5 seconds... Press Ctrl+C to abort."

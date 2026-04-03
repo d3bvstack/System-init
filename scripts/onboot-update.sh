@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# /usr/local/sbin/onboot-update.sh
+# Purpose: Run unattended apt updates at boot with a minimum interval.
 
-# Strict error handling
+# Exit on errors, unset variables, and pipeline failures.
 set -Eeuo pipefail
 
-# Non-interactive mode for APT
+# Prevent apt from opening interactive prompts.
 export DEBIAN_FRONTEND=noninteractive
 
-# Configuration
+# Define update state path and minimum interval between runs.
 STAMP_DIR="/var/lib/local-updates"
 STAMP_FILE="$STAMP_DIR/last-update.stamp"
 TIMEOUT_MINUTES=720 # 12 hours
 
-# Ensure the state directory exists (FHS compliant for persistent state data)
+# Ensure the state directory exists for persistent run metadata.
 mkdir -p "$STAMP_DIR"
 
-# Check if the timestamp file exists and was modified within the last 12 hours
+# Skip when the previous successful run is still within the interval.
 if [ -f "$STAMP_FILE" ]; then
-    # Find will output the filename if it was modified less than TIMEOUT_MINUTES ago
+    # find returns the file path when modification age is below timeout.
     RECENT_RUN=$(find "$STAMP_FILE" -mmin -"$TIMEOUT_MINUTES" 2>/dev/null)
     if [ -n "$RECENT_RUN" ]; then
         echo "Last update was performed less than 12 hours ago. Skipping update."
@@ -27,19 +27,19 @@ fi
 
 echo "Initiating Stable system update..."
 
-# Add a lock timeout in case another APT process (like packagekit) is running
+# Wait briefly for apt locks if another package manager process is active.
 APT_OPTS="-o DPkg::Lock::Timeout=120"
 
-# Execute updates
+# Refresh package metadata.
 apt-get $APT_OPTS update
 
-# Safe to use full-upgrade on Debian Stable
+# Install all available updates.
 apt-get $APT_OPTS full-upgrade -y
 
-# Cleanup
+# Remove no-longer-needed packages and clean apt cache.
 apt-get $APT_OPTS autoremove --purge -y
 apt-get $APT_OPTS clean
 
-# Update the timestamp file
+# Record successful completion time.
 touch "$STAMP_FILE"
 echo "System update completed successfully."

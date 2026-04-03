@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
+# Purpose: Install and enable the onboot-update systemd service.
 
+# Exit on errors, unset variables, and pipeline failures.
 set -Eeuo pipefail
 
+# Resolve repository root from hook location so cwd does not matter.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
@@ -18,6 +21,7 @@ if [[ ! -f "$SERVICE_SOURCE" ]]; then
     exit 1
 fi
 
+# Install service files into system paths and enable startup.
 install -Dm755 "$UPDATE_SCRIPT_SOURCE" /usr/local/sbin/onboot-update.sh
 install -Dm644 "$SERVICE_SOURCE" /etc/systemd/system/onboot-update.service
 

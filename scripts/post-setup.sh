@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
+# Purpose: Run post-setup hooks in a deterministic order.
 
-# Runs post-reboot setup actions in a predictable order.
+# Exit on errors, unset variables, and pipeline failures.
 set -Eeuo pipefail
 
+# Resolve repository paths from script location so cwd does not matter.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 CORE_HOOK_DIR="$REPO_DIR/post-setup/hooks"
 LOCAL_HOOK_DIR="/etc/post-setup.d"
 
+# Require sudo context so root access and target user mapping are both available.
 if [[ "$EUID" -ne 0 ]]; then
     echo "ERROR: Please run with sudo from your normal user account."
     exit 1
@@ -19,6 +22,7 @@ if [[ -z "${SUDO_USER:-}" || "${SUDO_USER}" == "root" ]]; then
 fi
 
 run_hook() {
+    # Execute one hook and fail when a required hook file is missing.
     local hook_path="$1"
 
     if [[ ! -f "$hook_path" ]]; then
@@ -32,6 +36,7 @@ run_hook() {
 
 echo ">> Starting post-setup tasks for user: ${SUDO_USER}"
 
+# Core hooks are ordered by numeric prefix.
 core_hooks=(
     "$CORE_HOOK_DIR/10-install-onboot-update.sh"
     "$CORE_HOOK_DIR/20-run-automount-disks.sh"
@@ -39,10 +44,12 @@ core_hooks=(
     "$CORE_HOOK_DIR/40-install-labwc.sh"
 )
 
+# Run built-in hooks first.
 for hook in "${core_hooks[@]}"; do
     run_hook "$hook"
 done
 
+# Run optional local extension hooks after built-in hooks.
 if [[ -d "$LOCAL_HOOK_DIR" ]]; then
     echo ">> Loading extension hooks from $LOCAL_HOOK_DIR"
     while IFS= read -r -d '' hook; do

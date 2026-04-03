@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
+# Purpose: Install labwc and initialize user configuration files.
 
+# Exit on errors, unset variables, and pipeline failures.
 set -Eeuo pipefail
 
+# Prevent apt from opening interactive prompts.
 export DEBIAN_FRONTEND=noninteractive
 
+# Resolve repository-relative paths once and reuse across functions.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 LABWC_REPO_URL="https://github.com/labwc/labwc"
@@ -29,11 +33,13 @@ DOCKER_BUILD_DEPS=(
     "libcairo2-dev"
 )
 
+# Require root privileges because this script installs packages and writes system paths.
 if [[ "$EUID" -ne 0 ]]; then
     echo "ERROR: Please run with sudo from your normal user account."
     exit 1
 fi
 
+# Require sudo user context so copied files have correct ownership.
 if [[ -z "${SUDO_USER:-}" || "${SUDO_USER}" == "root" ]]; then
     echo "ERROR: Run this script via sudo from a non-root account so user mappings are preserved."
     exit 1
@@ -73,6 +79,7 @@ BUILD_DEPS=(
 )
 
 prompt_install_mode() {
+    # Prompt for installation mode when LABWC_INSTALL_MODE is unset.
     local mode=""
 
     while [[ -z "$mode" ]]; do
@@ -103,6 +110,7 @@ prompt_install_mode() {
 }
 
 install_from_package() {
+    # Install labwc from Debian repositories.
     echo ">> Installing labwc from Debian repositories..."
 
     apt-get update
@@ -114,6 +122,7 @@ install_from_package() {
 }
 
 install_from_source() {
+    # Build and install the latest upstream labwc tag directly on host.
     local latest_tag=""
     local dep=""
     local pre_manual_list=()
@@ -128,7 +137,7 @@ install_from_source() {
     apt-get update
     apt-get install -y --no-install-recommends "${BUILD_DEPS[@]}"
 
-    # Mark only newly introduced/manual build deps as auto for safe cleanup.
+    # Mark newly introduced build dependencies as auto for cleanup.
     for dep in "${BUILD_DEPS[@]}"; do
         if [[ -z "${pre_manual_map[$dep]:-}" ]]; then
             apt-mark auto "$dep" >/dev/null || true
@@ -152,6 +161,7 @@ install_from_source() {
     echo ">> Building labwc tag: $latest_tag"
     git -C "$LABWC_REPO_CLONE_DIR" checkout -f "$latest_tag"
 
+    # Configure, compile, and install labwc to the host filesystem.
     rm -rf "$LABWC_REPO_CLONE_DIR/build"
     meson setup "$LABWC_REPO_CLONE_DIR/build" "$LABWC_REPO_CLONE_DIR" --buildtype=release -Dxwayland=disabled
     ninja -C "$LABWC_REPO_CLONE_DIR/build"
@@ -165,6 +175,7 @@ install_from_source() {
 }
 
 install_from_docker_package() {
+    # Build a .deb in an isolated Debian container, then install it on host.
     local codename=""
     local docker_image=""
     local build_stamp=""
@@ -228,6 +239,7 @@ install_from_docker_package() {
         return 1
     fi
 
+    # Install with apt so runtime dependencies are resolved consistently.
     echo ">> Installing built package: $package_path"
     apt-get update
     apt-get install -y "$package_path"
@@ -236,6 +248,7 @@ install_from_docker_package() {
 }
 
 copy_if_missing() {
+    # Copy a config file only when the destination does not already exist.
     local src_file="$1"
     local dest_file="$2"
 
@@ -254,6 +267,7 @@ copy_if_missing() {
 }
 
 copy_labwc_configs() {
+    # Prefer repository config overrides, then fall back to distro defaults.
     local copied=0
     local found_repo_files=0
 
@@ -286,6 +300,7 @@ copy_labwc_configs() {
 }
 
 main() {
+    # Resolve installation mode, perform install, then initialize user config files.
     local install_mode="${LABWC_INSTALL_MODE:-}"
 
     case "$install_mode" in
