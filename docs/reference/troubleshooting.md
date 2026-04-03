@@ -98,6 +98,26 @@ sudo bash -x /etc/post-setup.d/<failing-hook>.sh
 
 ## scripts/automount-disks.sh
 
+### Failure: script exits immediately
+Symptoms:
+- Error about missing `findmnt` or `systemctl`
+- Error saying PID 1 is not systemd
+- Error refusing direct root execution
+
+Likely Causes:
+- Required util-linux or systemd tooling is missing
+- The host was booted without systemd
+- The script was launched as root instead of via `sudo` from a normal user account
+
+Troubleshooting:
+```bash
+command -v findmnt
+command -v systemctl
+cat /proc/1/comm
+whoami
+echo "$SUDO_USER"
+```
+
 ### Failure: no disks configured
 Symptoms:
 - Script completes but no new fstab entries are added
@@ -105,11 +125,13 @@ Symptoms:
 Likely Causes:
 - No unmounted EXT4/NTFS disks detected
 - Existing UUIDs already present in `/etc/fstab`
+- The current mount point is already occupied or invalid
 
 Troubleshooting:
 ```bash
 lsblk -f
 grep -E 'UUID=.*(ext4|ntfs|ntfs3)' /etc/fstab
+findmnt --mountpoint "/mnt/your-mount-point"
 ```
 
 ### Failure: mount or ownership operations fail
@@ -120,12 +142,14 @@ Likely Causes:
 - Filesystem issues
 - Mountpoint conflicts
 - Permission/context mismatch
+- The ext4 volume is already mounted elsewhere
 
 Troubleshooting:
 ```bash
 sudo dmesg | tail -n 50
 sudo mount | grep /mnt/
 sudo fsck -N /dev/<device>
+findmnt --mountpoint "/mnt/your-mount-point"
 ```
 
 ### Recovery: restore fstab backup

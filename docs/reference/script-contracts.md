@@ -225,14 +225,16 @@ Inputs and Invocation:
 
 Required Environment:
 - Root privileges
-- `lsblk`, `grep`, `mount`, `umount`, `chown`, `systemctl`
+- `findmnt`, `lsblk`, `grep`, `mount`, `umount`, `chown`, `systemctl`
+- systemd as PID 1
 
 Side Effects:
 - Creates backup `/etc/fstab.backup.<timestamp>`
-- Appends entries to `/etc/fstab` for eligible devices
+- Adds or updates entries in `/etc/fstab` for eligible devices
 - Creates mount directories under `/mnt`
-- Temporarily mounts EXT4 volumes to set ownership
-- Reloads systemd and restarts `local-fs.target`
+- Temporarily mounts EXT4 volumes to set the mount root ownership for the invoking sudo user
+- Maps NTFS ownership with `uid=`, `gid=`, and `umask=022`
+- Reloads systemd daemon state after changes
 
 Idempotency:
 - Checks existing UUID entries in `/etc/fstab` before appending

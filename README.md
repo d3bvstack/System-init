@@ -113,9 +113,9 @@ After reboot, log back in and continue with stage two.
 - Installs `onboot-update.sh` to `/usr/local/sbin/onboot-update.sh`.
 - Installs `onboot-update.service` to `/etc/systemd/system/onboot-update.service`.
 - Reloads systemd and enables `onboot-update.service`.
-- May append automount entries to `/etc/fstab` for detected unmounted EXT4/NTFS disks.
+- May add or update `/etc/fstab` entries for detected unmounted EXT4/NTFS disks; ext4 volumes are mounted once to set mount-root ownership for the invoking sudo user, and NTFS entries map ownership with `uid=`/`gid=`.
 - Creates `/etc/fstab.backup.<timestamp>` before writing fstab changes.
-- Reloads systemd and restarts `local-fs.target` during automount configuration.
+- Reloads systemd after automount changes are written so newly created or updated automount units are recognized.
 - Installs Docker Engine and plugins from Docker's official apt repository.
 - Prompts for labwc install mode (Debian package, latest source build, or docker-package), unless `LABWC_INSTALL_MODE` environment variable is set to skip prompt.
 - Docker-package mode builds a labwc `.deb` in a Debian container matching host `VERSION_CODENAME`, then installs the resulting package on the host.
@@ -175,7 +175,7 @@ curl -sSL https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts
 ```
 
 **Configure disk automounting only:**
-Downloads and runs the automount script, which detects unmounted EXT4/NTFS disks and appends automount entries to `/etc/fstab`.
+Downloads and runs the automount script, which detects unmounted EXT4/NTFS disks, requires `findmnt` and systemd, and adds or updates automount entries in `/etc/fstab`.
 ```bash
 curl -sSL https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts/automount-disks.sh | sudo bash
 ```
