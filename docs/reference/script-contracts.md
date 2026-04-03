@@ -100,6 +100,77 @@ Side Effects:
 Idempotency:
 - Same idempotency profile as `scripts/automount-disks.sh`
 
+## post-setup/hooks/30-install-labwc.sh
+
+Purpose:
+Invoke labwc installer script.
+
+Inputs and Invocation:
+- Executed by dispatcher as root
+- Requires repository file: `scripts/install-labwc.sh`
+
+Required Environment:
+- `bash`
+
+Side Effects:
+- Delegates all side effects to `scripts/install-labwc.sh`
+
+Idempotency:
+- Same idempotency profile as `scripts/install-labwc.sh`
+
+## scripts/install-labwc.sh
+
+Purpose:
+Install labwc from Debian repos or build latest tagged release from source, then deploy missing user config files.
+
+Inputs and Invocation:
+- Run as root via sudo from non-root account: `sudo ./scripts/install-labwc.sh`
+- Interactive prompt selects installation mode unless `LABWC_INSTALL_MODE` environment variable is set
+- Uses `SUDO_USER` to determine target user context
+
+Required Environment:
+- Root privileges and valid `SUDO_USER`
+- `apt-get`, `apt-mark`, `git`, `meson`, `ninja`, `install`, `ldconfig`
+- Network access to Debian repositories and `https://github.com/labwc/labwc`
+- Optional: `LABWC_INSTALL_MODE` — When set to `package` or `source`, skips interactive prompt. Any other value causes script to exit with error.
+
+Labwc Runtime Dependencies (Upstream Reference):
+- wlroots, wayland, libinput, xkbcommon
+- libxml2, cairo, pango, glib-2.0
+- libpng
+- Optional: librsvg >= 2.46, libsfdo, xwayland, xcb
+
+Labwc Build Dependencies (Upstream Reference):
+- meson, ninja, gcc/clang, wayland-protocols
+
+Note: Source mode installs the Debian packages currently required to build labwc on this repository's target release, which may include more than the minimal upstream build set.
+
+Build Dependencies (Source Mode Only):
+The script installs and then removes the following packages when building from source:
+- build-essential, git, meson, ninja-build, pkg-config, scdoc
+- libwayland-dev, wayland-protocols, libwlroots-dev, libpixman-1-dev
+- libxkbcommon-dev, libxml2-dev, libpango1.0-dev, libcairo2-dev
+
+Note: Assume these package names are valid for Debian Trixie; verify availability for target release.
+
+Side Effects:
+- If `LABWC_INSTALL_MODE` not set, displays interactive prompt allowing user to select between `package` or `source` mode
+- Package mode: installs `labwc` package through apt
+- Source mode: installs build dependencies, clones/fetches `https://github.com/labwc/labwc`, resolves latest release tag using `git tag --sort=-v:refname`, checks out tag, builds with `meson`/`ninja`, installs with `ninja install`, calls `ldconfig`
+- Source mode: configures Meson with `-Dxwayland=disabled`
+- Source mode: if the correct wlroots version is not available on the system, Meson may automatically download the wlroots repository as a subproject
+- Source mode: marks only newly-installed build dependencies as auto (preserves pre-existing manual installs), then runs `apt-get autoremove --purge -y`
+- Deploys config files to `${XDG_CONFIG_HOME:-$HOME/.config}/labwc`: uses binary selection (not partial fallback) — if any candidate files exist in repo `.config/labwc`, copies matching files from there; otherwise, if zero files found in repo, attempts to copy matching files from `/usr/share/doc/labwc`
+- Config files targeted: `rc.xml`, `menu.xml`, `autostart`, `shutdown`, `environment`, `themerc-override`
+- Makes `autostart`, `shutdown`, and `environment` config files executable (chmod 755) after copying
+- Never overwrites existing destination files
+- Creates `/usr/local/src/labwc` directory if needed and clones source repository there
+
+Idempotency:
+- Package mode is mostly idempotent via apt
+- Source mode reinstalls the latest tag and is repeatable but not strictly no-op (re-runs build, reinstalls binary)
+- Config deployment is idempotent because existing files are preserved and skipped
+
 ## scripts/onboot-update.sh
 
 Purpose:

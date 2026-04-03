@@ -33,9 +33,11 @@ Deep behavior details are in the reference documents linked at the end of this f
 |-- post-setup/
 |   `-- hooks/
 |       |-- 10-install-onboot-update.sh
-|       `-- 20-run-automount-disks.sh
+|       |-- 20-run-automount-disks.sh
+|       `-- 30-install-labwc.sh
 |-- scripts/
 |   |-- automount-disks.sh
+|   |-- install-labwc.sh
 |   |-- onboot-update.sh
 |   |-- post-setup.sh
 |   `-- setup.sh
@@ -109,6 +111,10 @@ After reboot, log back in and continue with stage two.
 - May append automount entries to `/etc/fstab` for detected unmounted EXT4/NTFS disks.
 - Creates `/etc/fstab.backup.<timestamp>` before writing fstab changes.
 - Reloads systemd and restarts `local-fs.target` during automount configuration.
+- Prompts for labwc install mode (Debian package or latest source build), unless `LABWC_INSTALL_MODE` environment variable is set to skip prompt.
+- Source mode installs build dependencies transiently, then removes only newly-added packages via `apt-mark auto` (preserves pre-existing manual package installs).
+- Deploys labwc config files to `${XDG_CONFIG_HOME:-$HOME/.config}/labwc`: uses binary selection to copy from repo `.config/labwc` if it contains any candidate files; otherwise attempts `/usr/share/doc/labwc` as fallback. Never overwrites existing files.
+- Source mode builds labwc with xwayland disabled and may let Meson download wlroots automatically when the required system version is unavailable.
 
 `scripts/post-setup.sh` runs ordered hooks and stops on the first failure.
 
@@ -116,6 +122,7 @@ Current core hooks:
 
 - Install and enable the on-boot update service.
 - Run disk automount configuration.
+- Install labwc (Debian package or latest source build, chosen interactively).
 
 Run:
 

@@ -35,6 +35,7 @@ echo ">> Starting post-setup tasks for user: ${SUDO_USER}"
 core_hooks=(
     "$CORE_HOOK_DIR/10-install-onboot-update.sh"
     "$CORE_HOOK_DIR/20-run-automount-disks.sh"
+    "$CORE_HOOK_DIR/30-install-labwc.sh"
 )
 
 for hook in "${core_hooks[@]}"; do

@@ -138,6 +138,142 @@ sudo systemctl daemon-reload
 sudo systemctl restart local-fs.target
 ```
 
+## scripts/install-labwc.sh
+
+### Failure: script rejects execution context
+Symptoms:
+- Error asking to run with sudo from a non-root account
+
+Likely Causes:
+- Direct root shell execution without `SUDO_USER`
+
+Troubleshooting:
+```bash
+whoami
+echo "$SUDO_USER"
+sudo ./scripts/install-labwc.sh
+```
+
+### Failure: package mode cannot install labwc
+Symptoms:
+- `apt-get install -y labwc` fails
+
+Likely Causes:
+- Package unavailable in configured repositories
+- Apt cache stale or network issues
+
+Troubleshooting:
+```bash
+apt-cache policy labwc
+sudo apt-get update
+sudo apt-get install -y labwc
+```
+
+### Failure: source mode build fails
+Symptoms:
+- Build stops during Meson configure or Ninja compile
+
+Likely Causes:
+- Missing or mismatched build dependencies
+- Required wlroots version not present on the system and network access blocked for Meson subproject download
+- Upstream source changes
+
+Troubleshooting:
+```bash
+sudo apt-get install -y --no-install-recommends build-essential meson ninja-build pkg-config scdoc wayland-protocols
+sudo apt-get -f install
+sudo ./scripts/install-labwc.sh
+```
+
+### Failure: xwayland-disabled build still pulls X11-related errors
+Symptoms:
+- Meson configure fails around optional X11 support or xwayland symbols
+
+Likely Causes:
+- Outdated build directory from previous configuration
+- Source tree configured before xwayland was disabled
+
+Troubleshooting:
+```bash
+rm -rf /usr/local/src/labwc/build
+sudo ./scripts/install-labwc.sh
+```
+
+### Failure: no configs copied
+Symptoms:
+- Install succeeds but expected files are missing under `${XDG_CONFIG_HOME:-$HOME/.config}/labwc`
+
+Likely Causes:
+- No matching files in repo `.config/labwc`
+- `/usr/share/doc/labwc` does not include expected defaults for current package version
+
+Troubleshooting:
+```bash
+ls -la .config/labwc
+ls -la /usr/share/doc/labwc
+ls -la "${XDG_CONFIG_HOME:-$HOME/.config}/labwc"
+```
+
+### Failure: LABWC_INSTALL_MODE set to invalid value
+Symptoms:
+- Script exits immediately with error message
+
+Likely Causes:
+- Environment variable set to value other than `package` or `source`
+
+Troubleshooting:
+```bash
+echo "$LABWC_INSTALL_MODE"
+unset LABWC_INSTALL_MODE
+sudo ./scripts/install-labwc.sh
+```
+
+### Failure: Git tag resolution or clone fails
+Symptoms:
+- Error during `git clone`, `git fetch`, or tag resolution in source mode
+
+Likely Causes:
+- Network issues accessing `https://github.com/labwc/labwc`
+- No network connectivity
+- GitHub repository unavailable or access blocked
+
+Troubleshooting:
+```bash
+ping github.com
+git ls-remote https://github.com/labwc/labwc | head -20
+rm -rf /usr/local/src/labwc
+sudo ./scripts/install-labwc.sh
+```
+
+### Failure: /usr/local/src/labwc corrupted or stale
+Symptoms:
+- Build fails with checkout, configure, or compile errors despite clean dependency install
+
+Likely Causes:
+- Previous interrupted build left incomplete files
+- Source tree in inconsistent state
+
+Troubleshooting:
+```bash
+sudo rm -rf /usr/local/src/labwc
+sudo ./scripts/install-labwc.sh
+```
+
+### Failure: Build cleanup (apt-mark/autoremove) fails or behaves unexpectedly
+Symptoms:
+- Source build completes but `apt-get autoremove --purge` reports errors or removes unexpected packages
+
+Likely Causes:
+- Some build dependencies already manually installed before script run
+- System dependency resolver mismatch
+
+Troubleshooting:
+```bash
+apt-mark showmanual | grep -E 'meson|ninja-build|libwayland|wlroots|libxkbcommon'
+sudo apt-get -s autoremove
+sudo apt-mark manual <package-name>  # Re-mark if needed
+```
+
 ## scripts/onboot-update.sh and onboot-update.service
 
 ### Failure: updater does not run at boot

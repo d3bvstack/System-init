@@ -17,11 +17,13 @@ Quick links:
 - [scripts/post-setup.sh](script-contracts.md#scriptspost-setupsh) — Post-reboot dispatcher
 - [scripts/onboot-update.sh](script-contracts.md#scriptsonboot-updatesh) — 12-hour debounced updater
 - [scripts/automount-disks.sh](script-contracts.md#scriptsautomount-diskssh) — Detect and automount EXT4/NTFS
+- [scripts/install-labwc.sh](script-contracts.md#scriptsinstall-labwcsh) — Install labwc from package or source and deploy config
 - [systemd/onboot-update.service](script-contracts.md#systemdonboot-updateservice) — Service unit and hardening policy
 
 Hooks:
 - [10-install-onboot-update.sh](script-contracts.md#post-setup-hooks-10-install-onboot-updatesh) — Install updater hook
 - [20-run-automount-disks.sh](script-contracts.md#post-setup-hooks-20-run-automount-diskssh) — Run automount hook
+- [post-setup/hooks/30-install-labwc.sh](script-contracts.md#post-setup-hooks-30-install-labwcsh) — Run labwc install hook
 
 ### "A script failed. How do I fix it?"
 
@@ -41,6 +43,15 @@ See the [Failure Modes & Troubleshooting](troubleshooting.md) reference, organiz
 - [no disks configured](troubleshooting.md#failure-no-disks-configured)
 - [mount or ownership failures](troubleshooting.md#failure-mount-or-ownership-operations-fail)
 - [restore from fstab backup](troubleshooting.md#recovery-restore-fstab-backup)
+
+**Labwc Installation:**
+- [script rejects execution context](troubleshooting.md#failure-script-rejects-execution-context)
+- [package mode install fails](troubleshooting.md#failure-package-mode-cannot-install-labwc)
+- [source mode build fails](troubleshooting.md#failure-source-mode-build-fails)
+- [no config files copied](troubleshooting.md#failure-no-configs-copied)
+- [invalid LABWC_INSTALL_MODE](troubleshooting.md#failure-labwc_install_mode-set-to-invalid-value)
+- [git tag resolution fails](troubleshooting.md#failure-git-tag-resolution-or-clone-fails)
+- [build cleanup issues](troubleshooting.md#failure-build-cleanup-apt-markautoremove-fails-or-behaves-unexpectedly)
 
 **On-Boot Updater:**
 - [service not running at boot](troubleshooting.md#failure-updater-does-not-run-at-boot)
@@ -62,5 +73,6 @@ See the [Failure Modes & Troubleshooting](troubleshooting.md) reference, organiz
 | `scripts/setup.sh` | [link](script-contracts.md#scriptssetupsh) | [link](troubleshooting.md#stage-1-scriptssetupsh) | 1 |
 | `scripts/post-setup.sh` | [link](script-contracts.md#scriptspost-setupsh) | [link](troubleshooting.md#stage-2-scriptspost-setupsh) | 2 |
 | `scripts/automount-disks.sh` | [link](script-contracts.md#scriptsautomount-diskssh) | [link](troubleshooting.md#scriptsautomount-diskssh) | 2 |
+| `scripts/install-labwc.sh` | [link](script-contracts.md#scriptsinstall-labwcsh) | [link](troubleshooting.md#scriptsinstall-labwcsh) | 2 |
 | `scripts/onboot-update.sh` | [link](script-contracts.md#scriptsonboot-updatesh) | [link](troubleshooting.md#scripts-onboot-updatesh-and-onboot-updateservice) | boot |
 | `systemd/onboot-update.service` | [link](script-contracts.md#systemdonboot-updateservice) | [link](troubleshooting.md#scripts-onboot-updatesh-and-onboot-updateservice) | boot |
