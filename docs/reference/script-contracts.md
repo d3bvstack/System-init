@@ -139,18 +139,20 @@ Idempotency:
 ## scripts/install-labwc.sh
 
 Purpose:
-Install labwc from Debian repos or build latest tagged release from source, then deploy missing user config files.
+Install labwc from Debian repos, build latest tagged release from source, or build/install a Debian package via Docker, then deploy missing user config files.
 
 Inputs and Invocation:
 - Run as root via sudo from non-root account: `sudo ./scripts/install-labwc.sh`
 - Interactive prompt selects installation mode unless `LABWC_INSTALL_MODE` environment variable is set
+- Interactive prompt offers three choices: package, source, docker-package
 - Uses `SUDO_USER` to determine target user context
 
 Required Environment:
 - Root privileges and valid `SUDO_USER`
 - `apt-get`, `apt-mark`, `git`, `meson`, `ninja`, `install`, `ldconfig`
 - Network access to Debian repositories and `https://github.com/labwc/labwc`
-- Optional: `LABWC_INSTALL_MODE` — When set to `package` or `source`, skips interactive prompt. Any other value causes script to exit with error.
+- Optional: `LABWC_INSTALL_MODE` — When set to `package`, `source`, or `docker-package`, skips interactive prompt. Any other value causes script to exit with error.
+- Docker-package mode also requires Docker CLI availability and a reachable Docker daemon.
 
 Labwc Runtime Dependencies (Upstream Reference):
 - wlroots, wayland, libinput, xkbcommon
@@ -172,12 +174,13 @@ The script installs and then removes the following packages when building from s
 Note: Assume these package names are valid for Debian Trixie; verify availability for target release.
 
 Side Effects:
-- If `LABWC_INSTALL_MODE` not set, displays interactive prompt allowing user to select between `package` or `source` mode
+- If `LABWC_INSTALL_MODE` not set, displays interactive prompt allowing user to select `package`, `source`, or `docker-package` mode
 - Package mode: installs `labwc` package through apt
 - Source mode: installs build dependencies, clones/fetches `https://github.com/labwc/labwc`, resolves latest release tag using `git tag --sort=-v:refname`, checks out tag, builds with `meson`/`ninja`, installs with `ninja install`, calls `ldconfig`
 - Source mode: configures Meson with `-Dxwayland=disabled`
 - Source mode: if the correct wlroots version is not available on the system, Meson may automatically download the wlroots repository as a subproject
 - Source mode: marks only newly-installed build dependencies as auto (preserves pre-existing manual installs), then runs `apt-get autoremove --purge -y`
+- Docker-package mode: builds a labwc `.deb` in a Debian container matching host `VERSION_CODENAME`, installs the resulting package on host, and retains build artifacts at `/usr/local/src/labwc-docker-build/<timestamp>/` (including `labwc*.deb`)
 - Deploys config files to `${XDG_CONFIG_HOME:-$HOME/.config}/labwc`: uses binary selection (not partial fallback) — if any candidate files exist in repo `.config/labwc`, copies matching files from there; otherwise, if zero files found in repo, attempts to copy matching files from `/usr/share/doc/labwc`
 - Config files targeted: `rc.xml`, `menu.xml`, `autostart`, `shutdown`, `environment`, `themerc-override`
 - Makes `autostart`, `shutdown`, and `environment` config files executable (chmod 755) after copying

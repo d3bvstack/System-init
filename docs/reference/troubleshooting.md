@@ -271,12 +271,43 @@ Symptoms:
 - Script exits immediately with error message
 
 Likely Causes:
-- Environment variable set to value other than `package` or `source`
+- Environment variable set to value other than `package`, `source`, or `docker-package`
 
 Troubleshooting:
 ```bash
 echo "$LABWC_INSTALL_MODE"
 unset LABWC_INSTALL_MODE
+sudo ./scripts/install-labwc.sh
+```
+
+### Failure: docker-package mode cannot start Docker build
+Symptoms:
+- Docker-based build exits early before package build steps complete
+
+Likely Causes:
+- Docker CLI is not installed or not in PATH
+- Docker daemon is not reachable
+
+Troubleshooting:
+```bash
+command -v docker
+docker version
+sudo systemctl status docker --no-pager
+sudo systemctl start docker
+```
+
+### Failure: docker-package mode fails during container apt or source fetch
+Symptoms:
+- Docker build starts, then fails while installing build dependencies or cloning labwc
+
+Likely Causes:
+- No network egress from host/container to Debian mirrors
+- No network egress from host/container to `https://github.com/labwc/labwc`
+
+Troubleshooting:
+```bash
+docker run --rm debian:trixie apt-get update
+curl -I https://github.com/labwc/labwc
 sudo ./scripts/install-labwc.sh
 ```
 

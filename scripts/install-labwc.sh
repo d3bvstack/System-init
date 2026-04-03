@@ -8,6 +8,26 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 LABWC_REPO_URL="https://github.com/labwc/labwc"
 LABWC_REPO_CLONE_DIR="/usr/local/src/labwc"
+LABWC_DOCKER_BUILD_ROOT="/usr/local/src/labwc-docker-build"
+
+DOCKER_BUILD_DEPS=(
+    "ca-certificates"
+    "git"
+    "build-essential"
+    "meson"
+    "ninja-build"
+    "pkg-config"
+    "scdoc"
+    "checkinstall"
+    "libwayland-dev"
+    "wayland-protocols"
+    "libwlroots-dev"
+    "libpixman-1-dev"
+    "libxkbcommon-dev"
+    "libxml2-dev"
+    "libpango1.0-dev"
+    "libcairo2-dev"
+)
 
 if [[ "$EUID" -ne 0 ]]; then
     echo "ERROR: Please run with sudo from your normal user account."
@@ -60,7 +80,8 @@ prompt_install_mode() {
         echo "Select labwc installation mode:"
         echo "1) Install distro package (apt install labwc)"
         echo "2) Build latest release from source ($LABWC_REPO_URL)"
-        read -r -p "Enter selection [1-2]: " choice
+        echo "3) Build .deb in Docker, then install package on host"
+        read -r -p "Enter selection [1-3]: " choice
 
         case "$choice" in
             1)
@@ -69,8 +90,11 @@ prompt_install_mode() {
             2)
                 mode="source"
                 ;;
+            3)
+                mode="docker-package"
+                ;;
             *)
-                echo "Invalid selection. Please enter 1 or 2."
+                echo "Invalid selection. Please enter 1, 2, or 3."
                 ;;
         esac
     done
@@ -140,6 +164,77 @@ install_from_source() {
     apt-get clean
 }
 
+install_from_docker_package() {
+    local codename=""
+    local docker_image=""
+    local build_stamp=""
+    local build_dir=""
+    local package_path=""
+
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "ERROR: Docker CLI not found. Install Docker first or choose another labwc installation mode."
+        return 1
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        echo "ERROR: Docker daemon is not reachable. Ensure the docker service is running and this user can access it."
+        return 1
+    fi
+
+    codename="$(. /etc/os-release && printf '%s' "${VERSION_CODENAME:-}")"
+    if [[ -z "$codename" ]]; then
+        echo "ERROR: Could not determine VERSION_CODENAME from /etc/os-release."
+        return 1
+    fi
+
+    docker_image="debian:${codename}"
+    build_stamp="$(date +%Y%m%d-%H%M%S)"
+    build_dir="$LABWC_DOCKER_BUILD_ROOT/$build_stamp"
+
+    mkdir -p "$build_dir"
+
+    echo ">> Building labwc package in container image: $docker_image"
+    docker run --rm \
+        -e DEBIAN_FRONTEND=noninteractive \
+        -e LABWC_REPO_URL="$LABWC_REPO_URL" \
+        -e DOCKER_BUILD_DEPS="${DOCKER_BUILD_DEPS[*]}" \
+        -v "$build_dir:/artifacts" \
+        "$docker_image" \
+        bash -lc '
+            set -Eeuo pipefail
+            apt-get update
+            apt-get install -y --no-install-recommends $DOCKER_BUILD_DEPS
+
+            git clone "$LABWC_REPO_URL" /tmp/labwc
+            latest_tag="$(git -C /tmp/labwc tag --sort=-v:refname | head -n1)"
+            if [[ -z "$latest_tag" ]]; then
+                echo "ERROR: Could not resolve latest labwc tag from upstream repository."
+                exit 1
+            fi
+
+            git -C /tmp/labwc checkout -f "$latest_tag"
+            meson setup /tmp/labwc/build /tmp/labwc --buildtype=release -Dxwayland=disabled
+            ninja -C /tmp/labwc/build
+
+            pkg_version="${latest_tag#v}"
+            checkinstall --type=debian --install=no --fstrans=no --default --nodoc \
+                --pkgname=labwc --pkgversion="$pkg_version" --pakdir=/artifacts \
+                ninja -C /tmp/labwc/build install
+        '
+
+    package_path="$(find "$build_dir" -maxdepth 1 -type f -name 'labwc*.deb' | sort | tail -n1 || true)"
+    if [[ -z "$package_path" ]]; then
+        echo "ERROR: Docker build completed but no labwc .deb package was found in $build_dir."
+        return 1
+    fi
+
+    echo ">> Installing built package: $package_path"
+    apt-get update
+    apt-get install -y "$package_path"
+
+    echo ">> Installed labwc package built in Docker. Artifact retained at: $package_path"
+}
+
 copy_if_missing() {
     local src_file="$1"
     local dest_file="$2"
@@ -194,22 +289,28 @@ main() {
     local install_mode="${LABWC_INSTALL_MODE:-}"
 
     case "$install_mode" in
-        package|source)
+        package|source|docker-package)
             ;;
         "")
             install_mode="$(prompt_install_mode)"
             ;;
         *)
-            echo "ERROR: LABWC_INSTALL_MODE must be 'package' or 'source' when set."
+            echo "ERROR: LABWC_INSTALL_MODE must be 'package', 'source', or 'docker-package' when set."
             exit 1
             ;;
     esac
 
-    if [[ "$install_mode" == "package" ]]; then
-        install_from_package
-    else
-        install_from_source
-    fi
+    case "$install_mode" in
+        package)
+            install_from_package
+            ;;
+        source)
+            install_from_source
+            ;;
+        docker-package)
+            install_from_docker_package
+            ;;
+    esac
 
     copy_labwc_configs
     echo ">> labwc installation flow completed successfully."

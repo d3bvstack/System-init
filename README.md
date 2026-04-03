@@ -117,7 +117,9 @@ After reboot, log back in and continue with stage two.
 - Creates `/etc/fstab.backup.<timestamp>` before writing fstab changes.
 - Reloads systemd and restarts `local-fs.target` during automount configuration.
 - Installs Docker Engine and plugins from Docker's official apt repository.
-- Prompts for labwc install mode (Debian package or latest source build), unless `LABWC_INSTALL_MODE` environment variable is set to skip prompt.
+- Prompts for labwc install mode (Debian package, latest source build, or docker-package), unless `LABWC_INSTALL_MODE` environment variable is set to skip prompt.
+- Docker-package mode builds a labwc `.deb` in a Debian container matching host `VERSION_CODENAME`, then installs the resulting package on the host.
+- Docker-package mode requires Docker CLI availability, a reachable Docker daemon, and network access for container apt operations and GitHub clone.
 - Source mode installs build dependencies transiently, then removes only newly-added packages via `apt-mark auto` (preserves pre-existing manual package installs).
 - Deploys labwc config files to `${XDG_CONFIG_HOME:-$HOME/.config}/labwc`: uses binary selection to copy from repo `.config/labwc` if it contains any candidate files; otherwise attempts `/usr/share/doc/labwc` as fallback. Never overwrites existing files.
 - Source mode builds labwc with xwayland disabled and may let Meson download wlroots automatically when the required system version is unavailable.
@@ -129,7 +131,7 @@ Current core hooks:
 - `post-setup/hooks/10-install-onboot-update.sh` — Install and enable the on-boot update service.
 - `post-setup/hooks/20-run-automount-disks.sh` — Run disk automount configuration.
 - `post-setup/hooks/30-install-docker.sh` — Install Docker from the official Docker apt repository.
-- `post-setup/hooks/40-install-labwc.sh` — Install labwc (Debian package or latest source build, chosen interactively).
+- `post-setup/hooks/40-install-labwc.sh` — Install labwc (package, source, or docker-package mode, chosen interactively or by environment variable).
 
 Run:
 
