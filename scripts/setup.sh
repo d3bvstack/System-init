@@ -74,21 +74,7 @@ sudo -u "$ACTUAL_USER" XDG_RUNTIME_DIR="/run/user/$ACTUAL_UID" \
 echo ">> Configuring PAM for Gnome Keyring..."
 # 'pam-auth-update' is the Debian-standard way to manage /etc/pam.d/ configurations
 sudo pam-auth-update --enable gnome-keyring
-
-# Idempotent append to .profile
-# if ! grep -q "gnome-keyring-daemon" "$ACTUAL_HOME/.profile" 2>/dev/null; then
-#    echo ">> Adding Keyring Daemon to $ACTUAL_HOME/.profile..."
-#    cat << 'EOF' >> "$ACTUAL_HOME/.profile"
-
-# Start Gnome Keyring Daemon
-if [ -n "$IS_TTY" ] || [ -z "$GRAPHICAL_SESSION" ]; then
-    eval $(gnome-keyring-daemon --start --components=secrets)
-    export SSH_AUTH_SOCK
-fi
-EOF
-    # Ensure correct ownership if script was run with sudo
-    sudo chown "$ACTUAL_USER":"$ACTUAL_USER" "$ACTUAL_HOME/.profile"
-fi
+# Keep shell profiles untouched here; keyring startup is delegated to PAM/session components.
 
 # 8. Visual Studio Code Installation
 echo ">> Installing VS Code..."

@@ -1,70 +1,91 @@
 # Debian 13 (Trixie) Post-Install and System Initialization
 
-This repository now uses a two-stage flow:
+This README is a how-to guide with quick orientation.
+
+The setup flow has two stages:
 
 1. `scripts/setup.sh` performs the base system bootstrap and reboots.
 2. `scripts/post-setup.sh` runs post-reboot tasks through ordered hooks.
 
-The post-setup step is intentionally extensible so future scripts can be added without rewriting the main entrypoint.
+Deep behavior details are in the reference documents linked at the end of this file.
 
 ## Table of Contents
 
-- [Preparation](#1-preparation)
-- [Stage One: Base Setup](#2-stage-one-base-setup)
-- [Stage Two: Post-Setup Dispatcher](#3-stage-two-post-setup-dispatcher)
-- [Extending Post-Setup](#4-extending-post-setup)
-- [Curl-Based Quick Start](#5-curl-based-quick-start)
-- [Verification](#6-verification)
+- [Quick Orientation](#1-quick-orientation)
+- [Prerequisites](#2-prerequisites)
+- [Stage One: Base Setup](#3-stage-one-base-setup)
+- [Stage Two: Post-Setup Dispatcher](#4-stage-two-post-setup-dispatcher)
+- [Extending Post-Setup](#5-extending-post-setup)
+- [Remote Bootstrap (No Clone)](#6-remote-bootstrap-no-clone)
+- [Trust and Integrity](#7-trust-and-integrity)
+- [Verification](#8-verification)
+- [Reference](#9-reference)
 
 ## Repository Layout
 
 ```text
 .
-├── README.md
-├── post-setup/
-│   └── hooks/
-│       ├── 10-install-onboot-update.sh
-│       └── 20-run-automount-disks.sh
-├── scripts/
-│   ├── automount-disks.sh
-│   ├── onboot-update.sh
-│   ├── post-setup.sh
-│   └── setup.sh
-└── systemd/
-	└── onboot-update.service
+|-- README.md
+|-- docs/
+|   `-- reference/
+|       |-- script-contracts.md
+|       `-- troubleshooting.md
+|-- post-setup/
+|   `-- hooks/
+|       |-- 10-install-onboot-update.sh
+|       `-- 20-run-automount-disks.sh
+|-- scripts/
+|   |-- automount-disks.sh
+|   |-- onboot-update.sh
+|   |-- post-setup.sh
+|   `-- setup.sh
+`-- systemd/
+    `-- onboot-update.service
 ```
 
-## Opinionated Defaults
+## 1. Quick Orientation
 
-This repository intentionally makes a few choices for a Debian 13 desktop setup:
+What this repository does:
 
-- Repositories include `non-free` and `non-free-firmware` because the setup is aimed at common desktop hardware, including AMD graphics and some Wi-Fi chipsets.
-- Core packages include `pipewire`, `pipewire-pulse`, `wireplumber`, `seatd`, `bluetooth`, `bluez-tools`, `gnome-keyring`, `libsecret`, `foot`, `bemenu`, `ddcutil`, `playerctl`, `git`, `wget`, `gpg`, and `apt-transport-https` so the machine is ready for a graphical desktop, media, Bluetooth, and common hardware utilities.
-- GPU and firmware packages include `firmware-amd-graphics`, `mesa` components, and `firmware-realtek` to cover typical AMD plus Realtek desktop hardware.
-- `code-insiders` is installed instead of the stable VS Code build.
-- `bluetooth` and `seatd` are enabled system-wide during setup, and the primary user is added to `video`, `render`, and `seat` groups so desktop and input access work without manual follow-up.
-- `onboot-update.sh` is designed as a debounced maintenance job with a 12-hour cooldown, `Nice=19`, and `IOSchedulingClass=idle` so it stays out of the way during login.
-- The updater service is locked down with `ProtectSystem=strict`, `PrivateTmp=true`, and explicit `ReadWritePaths` for only the apt and state directories it needs.
-- Disk automounting uses `x-systemd.automount`, `noauto`, and `x-systemd.idle-timeout=15min` so drives mount on demand instead of delaying boot or staying mounted forever.
-- EXT4 mounts are temporarily mounted once so ownership can be corrected for the active user, while NTFS mounts use `ntfs3` with `uid`, `gid`, `umask=022`, and `nofail` for predictable desktop access.
-- `scripts/automount-disks.sh` only configures disks it detects as `ext4`, `ntfs`, or `ntfs3`; other filesystems are left untouched.
-- The generated `fstab` entries end with `0 0`, which means the filesystems are not scheduled for boot-time fsck checks.
+- Configures Debian Trixie package sources and installs desktop-focused packages.
+- Enables core services (`bluetooth`, `seatd`) and user group mappings.
+- Installs and enables an on-boot update service.
+- Configures on-demand automount for detected unmounted EXT4/NTFS disks.
 
-## 1. Preparation
+## 2. Prerequisites
 
-From the repository directory, ensure scripts are executable:
+- Debian 13 (Trixie).
+- A non-root account with `sudo` privileges.
+- Internet access for apt and package repositories.
+- Commands run from the repository root.
+
+Make scripts executable:
 
 ```bash
 chmod +x scripts/*.sh post-setup/hooks/*.sh
 ```
 
-## 2. Stage One: Base Setup
+## 3. Stage One: Base Setup
+
+### Prerequisites
+
+- Run from your normal user account.
+- Save your work before running, because the script reboots the machine.
+
+### Side Effects
+
+- Rewrites `/etc/apt/sources.list` for Trixie repositories.
+- Runs `apt-get update` and `apt-get full-upgrade -y`.
+- Installs system packages and enables services.
+- Adds the invoking sudo user to `video`, `render`, and `seat` groups.
+- Installs `code-insiders` and its apt source.
+- Reboots automatically after a 5-second delay.
 
 `scripts/setup.sh` configures repositories, upgrades packages, installs core tooling, and configures services/users.
 
 WARNING: this script is destructive and reboots the machine when it finishes.
 
-Run from your normal user account via `sudo`:
+Run:
 
 ```bash
 sudo ./scripts/setup.sh
@@ -72,16 +93,29 @@ sudo ./scripts/setup.sh
 
 After reboot, log back in and continue with stage two.
 
-## 3. Stage Two: Post-Setup Dispatcher
+## 4. Stage Two: Post-Setup Dispatcher
 
-`scripts/post-setup.sh` is the new entrypoint for post-reboot actions. It runs ordered hooks and stops on the first failure.
+### Prerequisites
+
+- Stage one completed and the system has rebooted.
+- Run from a local clone of this repository.
+- Run through `sudo` from a non-root account.
+
+### Side Effects
+
+- Installs `onboot-update.sh` to `/usr/local/sbin/onboot-update.sh`.
+- Installs `onboot-update.service` to `/etc/systemd/system/onboot-update.service`.
+- Reloads systemd and enables `onboot-update.service`.
+- May append automount entries to `/etc/fstab` for detected unmounted EXT4/NTFS disks.
+- Creates `/etc/fstab.backup.<timestamp>` before writing fstab changes.
+- Reloads systemd and restarts `local-fs.target` during automount configuration.
+
+`scripts/post-setup.sh` runs ordered hooks and stops on the first failure.
 
 Current core hooks:
 
-- Installs `onboot-update.sh` to `/usr/local/sbin/onboot-update.sh`
-- Installs `onboot-update.service` to `/etc/systemd/system/onboot-update.service`
-- Reloads systemd and enables `onboot-update.service`
-- Runs `automount-disks.sh` to configure EXT4/NTFS automount entries
+- Install and enable the on-boot update service.
+- Run disk automount configuration.
 
 Run:
 
@@ -89,14 +123,14 @@ Run:
 sudo ./scripts/post-setup.sh
 ```
 
-## 4. Extending Post-Setup
+## 5. Extending Post-Setup
 
 The dispatcher uses a hybrid model:
 
-- Core ordered hooks in `post-setup/hooks/` (versioned in this repo)
-- Optional local hooks in `/etc/post-setup.d/*.sh` (machine-local extensions)
+- Core ordered hooks in `post-setup/hooks/` (versioned in this repo).
+- Optional local hooks in `/etc/post-setup.d/*.sh` (machine-local extensions).
 
-Add new behavior by creating a new hook script with an ordering prefix, for example:
+Add a local extension hook with an ordering prefix:
 
 ```bash
 sudo install -d /etc/post-setup.d
@@ -108,38 +142,33 @@ EOF
 sudo chmod +x /etc/post-setup.d/30-example.sh
 ```
 
-Then rerun:
+Rerun dispatcher:
 
 ```bash
 sudo ./scripts/post-setup.sh
 ```
 
-## 5. Curl-Based Quick Start
 
-If you do not want to clone the repository, you can launch individual scripts directly from curl.
+## 6. Remote Bootstrap (No Clone)
 
-Bootstrap the base system:
+Only self-contained scripts should be run remotely. Each command block below shows what it will execute:
 
+**Bootstrap the base system (stage one only):**
+Downloads and runs the main setup script, which configures repositories, installs core packages, and reboots.
 ```bash
 curl -sSL https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts/setup.sh | sudo bash
 ```
 
-Run the full post-setup dispatcher after reboot:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts/post-setup.sh | sudo bash
-```
-
-Run only the disk automount script:
-
+**Configure disk automounting only:**
+Downloads and runs the automount script, which detects unmounted EXT4/NTFS disks and appends automount entries to `/etc/fstab`.
 ```bash
 curl -sSL https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts/automount-disks.sh | sudo bash
 ```
 
-Install and enable only the on-boot update service:
-
+**Install and enable the on-boot update service only:**
+Downloads the update script and systemd unit, installs them to the correct locations, reloads systemd, and enables the service.
 ```bash
-cd $(mktemp -d)
+cd "$(mktemp -d)"
 curl -sSLo onboot-update.sh https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts/onboot-update.sh
 curl -sSLo onboot-update.service https://raw.githubusercontent.com/d3bvstack/System-init/master/systemd/onboot-update.service
 sudo install -Dm755 onboot-update.sh /usr/local/sbin/onboot-update.sh
@@ -148,15 +177,26 @@ sudo systemctl daemon-reload
 sudo systemctl enable onboot-update.service
 ```
 
-Run a single post-setup hook directly:
+Not supported as standalone remote execution (requires repository layout on disk):
+
+- `scripts/post-setup.sh`
+- `post-setup/hooks/*.sh`
+
+## 7. Trust and Integrity
+
+Piping remote scripts into a privileged shell is high risk. Prefer download-review-run:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/d3bvstack/System-init/master/post-setup/hooks/10-install-onboot-update.sh | sudo bash
+curl -sSLo /tmp/setup.sh https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts/setup.sh
+less /tmp/setup.sh
+sudo bash /tmp/setup.sh
 ```
 
-## 6. Verification
+For unattended automation, pin to an immutable ref (tag or commit SHA) and verify content before execution.
 
-Check that each phase completed as expected:
+## 8. Verification
+
+Check stage outcomes:
 
 ```bash
 systemctl --user status pipewire
@@ -165,9 +205,18 @@ systemctl status onboot-update.service
 grep -E 'x-systemd\.automount' /etc/fstab
 ```
 
-Optional: trigger and inspect updater logs immediately:
+Optional updater smoke test:
 
 ```bash
 sudo systemctl start onboot-update.service
 sudo journalctl -u onboot-update.service -n 50 --no-pager
 ```
+
+
+## 9. Reference
+
+For in-depth technical details, see the reference documentation:
+
+- [Reference Index](docs/reference/README.md): Overview of all available technical docs.
+- [Script Contracts](docs/reference/script-contracts.md): Inputs, required environment, side effects, and idempotency for each script.
+- [Failure Modes & Troubleshooting](docs/reference/troubleshooting.md): Common errors, recovery steps, and diagnostics for each stage.

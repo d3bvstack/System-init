@@ -6,9 +6,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-# Choose simple to make update non-blocking (on background)
-# Oneshot is blocking, it will only allow for login after completed update
-# Type=simple
+# Run once per activation and exit cleanly when the update cycle finishes.
 Type=oneshot
 ExecStart=/usr/local/sbin/onboot-update.sh
 # Run with minimal CPU/IO priority so it doesn't slow down your desktop login
