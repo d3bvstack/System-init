@@ -11,6 +11,7 @@ Deep behavior details are in the reference documents linked at the end of this f
 
 ## Table of Contents
 
+- [Repository Layout](#repository-layout)
 - [Quick Orientation](#1-quick-orientation)
 - [Prerequisites](#2-prerequisites)
 - [Stage One: Base Setup](#3-stage-one-base-setup)
@@ -28,15 +29,18 @@ Deep behavior details are in the reference documents linked at the end of this f
 |-- README.md
 |-- docs/
 |   `-- reference/
+|       |-- README.md
 |       |-- script-contracts.md
 |       `-- troubleshooting.md
 |-- post-setup/
 |   `-- hooks/
 |       |-- 10-install-onboot-update.sh
 |       |-- 20-run-automount-disks.sh
-|       `-- 30-install-labwc.sh
+|       |-- 30-install-docker.sh
+|       `-- 40-install-labwc.sh
 |-- scripts/
 |   |-- automount-disks.sh
+|   |-- install-docker.sh
 |   |-- install-labwc.sh
 |   |-- onboot-update.sh
 |   |-- post-setup.sh
@@ -53,6 +57,7 @@ What this repository does:
 - Enables core services (`bluetooth`, `seatd`) and user group mappings.
 - Installs and enables an on-boot update service.
 - Configures on-demand automount for detected unmounted EXT4/NTFS disks.
+- Installs Docker from the official Docker apt repository.
 
 ## 2. Prerequisites
 
@@ -111,6 +116,7 @@ After reboot, log back in and continue with stage two.
 - May append automount entries to `/etc/fstab` for detected unmounted EXT4/NTFS disks.
 - Creates `/etc/fstab.backup.<timestamp>` before writing fstab changes.
 - Reloads systemd and restarts `local-fs.target` during automount configuration.
+- Installs Docker Engine and plugins from Docker's official apt repository.
 - Prompts for labwc install mode (Debian package or latest source build), unless `LABWC_INSTALL_MODE` environment variable is set to skip prompt.
 - Source mode installs build dependencies transiently, then removes only newly-added packages via `apt-mark auto` (preserves pre-existing manual package installs).
 - Deploys labwc config files to `${XDG_CONFIG_HOME:-$HOME/.config}/labwc`: uses binary selection to copy from repo `.config/labwc` if it contains any candidate files; otherwise attempts `/usr/share/doc/labwc` as fallback. Never overwrites existing files.
@@ -120,9 +126,10 @@ After reboot, log back in and continue with stage two.
 
 Current core hooks:
 
-- Install and enable the on-boot update service.
-- Run disk automount configuration.
-- Install labwc (Debian package or latest source build, chosen interactively).
+- `post-setup/hooks/10-install-onboot-update.sh` — Install and enable the on-boot update service.
+- `post-setup/hooks/20-run-automount-disks.sh` — Run disk automount configuration.
+- `post-setup/hooks/30-install-docker.sh` — Install Docker from the official Docker apt repository.
+- `post-setup/hooks/40-install-labwc.sh` — Install labwc (Debian package or latest source build, chosen interactively).
 
 Run:
 
@@ -155,7 +162,6 @@ Rerun dispatcher:
 sudo ./scripts/post-setup.sh
 ```
 
-
 ## 6. Remote Bootstrap (No Clone)
 
 Only self-contained scripts should be run remotely. Each command block below shows what it will execute:
@@ -170,6 +176,14 @@ curl -sSL https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts
 Downloads and runs the automount script, which detects unmounted EXT4/NTFS disks and appends automount entries to `/etc/fstab`.
 ```bash
 curl -sSL https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts/automount-disks.sh | sudo bash
+```
+
+**Install Docker from the official apt repository:**
+Downloads the Docker installer, reviews it locally, and then runs it with root privileges.
+```bash
+curl -sSLo /tmp/install-docker.sh https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts/install-docker.sh
+less /tmp/install-docker.sh
+sudo bash /tmp/install-docker.sh
 ```
 
 **Install and enable the on-boot update service only:**
@@ -219,6 +233,12 @@ sudo systemctl start onboot-update.service
 sudo journalctl -u onboot-update.service -n 50 --no-pager
 ```
 
+Optional Docker verification:
+
+```bash
+sudo systemctl status docker --no-pager
+sudo docker run hello-world
+```
 
 ## 9. Reference
 

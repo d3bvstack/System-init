@@ -100,7 +100,25 @@ Side Effects:
 Idempotency:
 - Same idempotency profile as `scripts/automount-disks.sh`
 
-## post-setup/hooks/30-install-labwc.sh
+## post-setup/hooks/30-install-docker.sh
+
+Purpose:
+Invoke Docker installer script.
+
+Inputs and Invocation:
+- Executed by dispatcher as root
+- Requires repository file: `scripts/install-docker.sh`
+
+Required Environment:
+- `bash`
+
+Side Effects:
+- Delegates all side effects to `scripts/install-docker.sh`
+
+Idempotency:
+- Same idempotency profile as `scripts/install-docker.sh`
+
+## post-setup/hooks/40-install-labwc.sh
 
 Purpose:
 Invoke labwc installer script.
@@ -217,6 +235,36 @@ Idempotency:
 - Checks existing UUID entries in `/etc/fstab` before appending
 - Generally idempotent for previously configured disks
 - New disks produce new state changes
+
+## scripts/install-docker.sh
+
+Purpose:
+Install Docker Engine and plugins from Docker's official apt repository.
+
+Inputs and Invocation:
+- Run from repository root with elevated privileges: `sudo ./scripts/install-docker.sh`
+- Script can also run as root directly, but sudo invocation is preferred for consistency with repository usage patterns
+- Reads `/etc/os-release` and uses `VERSION_CODENAME` to write the Docker apt source stanza
+
+Required Environment:
+- Root privileges
+- Debian family host with `/etc/os-release`
+- `apt-get`, `curl`, `dpkg`, `install`, `chmod`, `systemctl`
+- Network connectivity to Debian package mirrors and `https://download.docker.com`
+
+Side Effects:
+- Runs `apt-get update` before dependency install and again after writing Docker source metadata
+- Installs `ca-certificates` and `curl` if missing
+- Writes the Docker GPG key to `/etc/apt/keyrings/docker.asc`
+- Writes `/etc/apt/sources.list.d/docker.sources`
+- Installs `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, and `docker-compose-plugin`
+- Does not modify user group membership (`docker` group access is out of scope)
+- Does not force-enable or force-start Docker service; runtime state follows package/system defaults
+
+Idempotency:
+- Re-running refreshes key/source files to the same target paths and re-runs apt metadata refresh
+- Package installation is apt-managed and safe to repeat
+- Expected repeat-run changes are limited to package manager refresh/install behavior
 
 ## systemd/onboot-update.service
 

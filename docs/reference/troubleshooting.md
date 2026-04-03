@@ -53,7 +53,7 @@ sudo apt-get install -y code-insiders
 
 ## Stage 2: scripts/post-setup.sh
 
-### Failure: script rejects execution context
+### Failure: post-setup dispatcher rejects execution context
 Symptoms:
 - Error asking for sudo or non-root account execution
 
@@ -138,9 +138,61 @@ sudo systemctl daemon-reload
 sudo systemctl restart local-fs.target
 ```
 
+## scripts/install-docker.sh
+
+### Failure: Docker repository setup or package install fails
+Symptoms:
+- Errors during key download, apt update, or package installation
+
+Likely Causes:
+- Network access to `download.docker.com` is blocked or unavailable
+- Host codename in `/etc/os-release` does not match the Debian release you intended to target
+- `curl` or apt prerequisites are missing or stale
+
+Troubleshooting:
+```bash
+cat /etc/os-release
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl
+curl -I https://download.docker.com/linux/debian/gpg
+sudo ./scripts/install-docker.sh
+```
+
+### Failure: Docker daemon is not running
+Symptoms:
+- `systemctl status docker` shows inactive, failed, or missing service state
+
+Likely Causes:
+- Service did not start automatically
+- systemd is not available in the current environment
+- Installation completed but the daemon hit a startup error
+
+Troubleshooting:
+```bash
+sudo systemctl start docker
+sudo systemctl status docker --no-pager
+sudo journalctl -u docker -n 50 --no-pager
+```
+
+### Failure: hello-world verification fails
+Symptoms:
+- `docker run hello-world` cannot pull or run the test image
+
+Likely Causes:
+- Docker daemon is not running
+- Networking or DNS issues block image pulls
+- User is not allowed to talk to the daemon without sudo
+
+Troubleshooting:
+```bash
+sudo docker run hello-world
+sudo systemctl status docker --no-pager
+docker info
+```
+
 ## scripts/install-labwc.sh
 
-### Failure: script rejects execution context
+### Failure: install-labwc rejects execution context
 Symptoms:
 - Error asking to run with sudo from a non-root account
 

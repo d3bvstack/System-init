@@ -17,13 +17,15 @@ Quick links:
 - [scripts/post-setup.sh](script-contracts.md#scriptspost-setupsh) — Post-reboot dispatcher
 - [scripts/onboot-update.sh](script-contracts.md#scriptsonboot-updatesh) — 12-hour debounced updater
 - [scripts/automount-disks.sh](script-contracts.md#scriptsautomount-diskssh) — Detect and automount EXT4/NTFS
+- [scripts/install-docker.sh](script-contracts.md#scriptsinstall-dockersh) — Install Docker from the official apt repository
 - [scripts/install-labwc.sh](script-contracts.md#scriptsinstall-labwcsh) — Install labwc from package or source and deploy config
 - [systemd/onboot-update.service](script-contracts.md#systemdonboot-updateservice) — Service unit and hardening policy
 
 Hooks:
 - [10-install-onboot-update.sh](script-contracts.md#post-setup-hooks-10-install-onboot-updatesh) — Install updater hook
 - [20-run-automount-disks.sh](script-contracts.md#post-setup-hooks-20-run-automount-diskssh) — Run automount hook
-- [post-setup/hooks/30-install-labwc.sh](script-contracts.md#post-setup-hooks-30-install-labwcsh) — Run labwc install hook
+- [post-setup/hooks/30-install-docker.sh](script-contracts.md#post-setup-hooks-30-install-dockersh) — Run Docker install hook
+- [post-setup/hooks/40-install-labwc.sh](script-contracts.md#post-setup-hooks-40-install-labwcsh) — Run labwc install hook
 
 ### "A script failed. How do I fix it?"
 
@@ -35,7 +37,7 @@ See the [Failure Modes & Troubleshooting](troubleshooting.md) reference, organiz
 - [code-insiders install problems](troubleshooting.md#failure-code-insiders-install-fails)
 
 **Stage 2 (Post-Setup Dispatcher):**
-- [execution context rejected](troubleshooting.md#failure-script-rejects-execution-context)
+- [post-setup dispatcher rejects execution context](troubleshooting.md#failure-post-setup-dispatcher-rejects-execution-context)
 - [missing hook/source files](troubleshooting.md#failure-missing-hooksource-files)
 - [local extension hook failures](troubleshooting.md#failure-local-extension-hook-breaks-dispatcher)
 
@@ -44,8 +46,13 @@ See the [Failure Modes & Troubleshooting](troubleshooting.md) reference, organiz
 - [mount or ownership failures](troubleshooting.md#failure-mount-or-ownership-operations-fail)
 - [restore from fstab backup](troubleshooting.md#recovery-restore-fstab-backup)
 
+**Docker Installation:**
+- [repository setup or package install fails](troubleshooting.md#failure-docker-repository-setup-or-package-install-fails)
+- [Docker daemon is not running](troubleshooting.md#failure-docker-daemon-is-not-running)
+- [hello-world verification fails](troubleshooting.md#failure-docker-hello-world-verification-fails)
+
 **Labwc Installation:**
-- [script rejects execution context](troubleshooting.md#failure-script-rejects-execution-context)
+- [install-labwc rejects execution context](troubleshooting.md#failure-install-labwc-rejects-execution-context)
 - [package mode install fails](troubleshooting.md#failure-package-mode-cannot-install-labwc)
 - [source mode build fails](troubleshooting.md#failure-source-mode-build-fails)
 - [no config files copied](troubleshooting.md#failure-no-configs-copied)
@@ -73,6 +80,7 @@ See the [Failure Modes & Troubleshooting](troubleshooting.md) reference, organiz
 | `scripts/setup.sh` | [link](script-contracts.md#scriptssetupsh) | [link](troubleshooting.md#stage-1-scriptssetupsh) | 1 |
 | `scripts/post-setup.sh` | [link](script-contracts.md#scriptspost-setupsh) | [link](troubleshooting.md#stage-2-scriptspost-setupsh) | 2 |
 | `scripts/automount-disks.sh` | [link](script-contracts.md#scriptsautomount-diskssh) | [link](troubleshooting.md#scriptsautomount-diskssh) | 2 |
+| `scripts/install-docker.sh` | [link](script-contracts.md#scriptsinstall-dockersh) | [link](troubleshooting.md#scriptsinstall-dockersh) | 2 |
 | `scripts/install-labwc.sh` | [link](script-contracts.md#scriptsinstall-labwcsh) | [link](troubleshooting.md#scriptsinstall-labwcsh) | 2 |
 | `scripts/onboot-update.sh` | [link](script-contracts.md#scriptsonboot-updatesh) | [link](troubleshooting.md#scripts-onboot-updatesh-and-onboot-updateservice) | boot |
 | `systemd/onboot-update.service` | [link](script-contracts.md#systemdonboot-updateservice) | [link](troubleshooting.md#scripts-onboot-updatesh-and-onboot-updateservice) | boot |
