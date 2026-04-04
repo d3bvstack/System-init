@@ -9,12 +9,14 @@ Wants=network-online.target
 # Run once per activation and exit cleanly when the update cycle finishes.
 Type=oneshot
 ExecStart=/usr/local/sbin/onboot-update.sh
+# Create /var/lib/local-updates before ExecStart and allow writes under ProtectSystem.
+StateDirectory=local-updates
 # Run with minimal CPU/IO priority so it doesn't slow down your desktop login
 Nice=19
 IOSchedulingClass=idle
 # Security hardening
 ProtectSystem=strict
-ReadWritePaths=/var/lib/local-updates /var/cache/apt /var/lib/apt /var/lib/dpkg /var/log/apt
+ReadWritePaths=/var/cache/apt /var/lib/apt /var/lib/dpkg /var/log/apt
 PrivateTmp=true
 
 [Install]

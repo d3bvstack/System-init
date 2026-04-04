@@ -96,6 +96,30 @@ sudo bash -n /etc/post-setup.d/*.sh
 sudo bash -x /etc/post-setup.d/<failing-hook>.sh
 ```
 
+## scripts/onboot-update.sh
+
+### Failure: updater fails on first run with stamp path errors
+Symptoms:
+- `onboot-update.service` exits non-zero on first start
+- Journal shows write/create errors for `/var/lib/local-updates/last-update.stamp` or `/var/lib/local-updates`
+
+Likely Causes:
+- Service hardening (`ProtectSystem=strict`) is active and the stamp directory does not exist yet
+- Unit file does not define a state directory for systemd to create before `ExecStart`
+
+Troubleshooting:
+```bash
+sudo systemctl cat onboot-update.service
+sudo systemctl daemon-reload
+sudo systemctl restart onboot-update.service
+sudo journalctl -u onboot-update.service -n 80 --no-pager
+```
+
+Expected unit setting:
+- `StateDirectory=local-updates`
+
+This setting ensures `/var/lib/local-updates` is created at service start with correct ownership and writable access under service sandboxing.
+
 ## scripts/automount-disks.sh
 
 ### Failure: script exits immediately
