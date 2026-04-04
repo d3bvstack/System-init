@@ -56,7 +56,7 @@ sudo apt-get install -y \
 # Enable required services and add user group memberships.
 echo ">> Enabling system services and configuring groups..."
 sudo systemctl enable --now bluetooth seatd
-sudo group add seat
+sudo groupadd seat
 sudo usermod -aG video,render,seat "$ACTUAL_USER"
 
 # Enable user-level PipeWire services by setting the user's runtime directory.
