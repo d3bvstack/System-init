@@ -280,7 +280,7 @@ while IFS= read -r line; do
         mkdir -p "$MOUNT_DIR"
 
         # Use the available NTFS driver and map file ownership to the target user.
-        FSTAB_ENTRY="UUID=$UUID  $MOUNT_DIR  $NTFS_FSTYPE  defaults,noatime,uid=$ACTUAL_UID,gid=$ACTUAL_GID,umask=022,nofail,noauto,users,x-systemd.automount,x-systemd.idle-timeout=15min,x-gvfs-show,x-gvfs-name=$SAFE_LABEL  0  0"
+        FSTAB_ENTRY="UUID=$UUID  $MOUNT_DIR  $NTFS_FSTYPE  defaults,noatime,uid=$ACTUAL_UID,gid=$ACTUAL_GID,umask=022,nofail,noauto,x-systemd.automount,x-systemd.idle-timeout=15min,x-gvfs-show,x-gvfs-name=$SAFE_LABEL  0  0"
         UPSERT_RESULT=$(upsert_fstab_entry "$UUID" "$FSTAB_ENTRY")
         if [[ "$UPSERT_RESULT" != "unchanged" ]]; then
             echo ">> ${UPSERT_RESULT^} /etc/fstab entry for UUID=$UUID."

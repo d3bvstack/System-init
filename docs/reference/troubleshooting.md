@@ -21,18 +21,18 @@ sudo apt-get -f install
 sudo apt-get full-upgrade -y
 ```
 
-### Failure: group creation fails for seat
+### Failure: seat group already exists
 Symptoms:
-- `groupadd`/`group add` reports group already exists or command mismatch
+- `groupadd seat` exits non-zero because the group already exists
 
 Likely Causes:
-- Group already exists
-- Script line uses distro-specific command syntax
+- The `seat` group was created by a previous setup run or is pre-created on the base image
 
 Troubleshooting:
 ```bash
 getent group seat
-sudo usermod -aG video,render,seat "$USER"
+sudo groupadd -f seat
+sudo ./scripts/setup.sh
 ```
 
 ### Failure: code-insiders install fails
@@ -115,30 +115,6 @@ sudo bash -n /etc/post-setup.d/*.sh
 sudo bash -x /etc/post-setup.d/<failing-hook>.sh
 ```
 
-## scripts/onboot-update.sh
-
-### Failure: updater fails on first run with stamp path errors
-Symptoms:
-- `onboot-update.service` exits non-zero on first start
-- Journal shows write/create errors for `/var/lib/local-updates/last-update.stamp` or `/var/lib/local-updates`
-
-Likely Causes:
-- Service hardening (`ProtectSystem=strict`) is active and the stamp directory does not exist yet
-- Unit file does not define a state directory for systemd to create before `ExecStart`
-
-Troubleshooting:
-```bash
-sudo systemctl cat onboot-update.service
-sudo systemctl daemon-reload
-sudo systemctl restart onboot-update.service
-sudo journalctl -u onboot-update.service -n 80 --no-pager
-```
-
-Expected unit setting:
-- `StateDirectory=local-updates`
-
-This setting ensures `/var/lib/local-updates` is created at service start with correct ownership and writable access under service sandboxing.
-
 ## scripts/automount-disks.sh
 
 ### Failure: script exits immediately
@@ -210,6 +186,32 @@ The script checks for helpers in this order:
 
 If your distro installs helpers in a different location, add that location to `PATH` for the sudo environment or install/link the helper in a standard `sbin` path.
 
+### Recovery: legacy NTFS entry still uses `users`
+Symptoms:
+- A desktop file manager shows a permission error when opening a managed NTFS mount created by an older script version
+- Journal entries include: `Error opening read-only '/dev/sdb1': Permission denied`
+
+Likely Causes:
+- An older or manually edited NTFS `/etc/fstab` entry still contains `users`; current automount runs no longer generate that option
+
+Troubleshooting:
+```bash
+grep -nE 'UUID=.*ntfs-3g' /etc/fstab
+journalctl -b -n 120 --no-pager | grep -E 'sdb1|ntfs|Permission denied|Unknown error when mounting'
+```
+
+Recovery:
+```bash
+# Regenerate managed entries with the current NTFS options.
+sudo ./scripts/automount-disks.sh
+
+# If needed, adjust an existing legacy entry manually by removing only the `users` token.
+sudo sed -i 's/,users,/,/g; s/,users / /g; s/ users,/ /g' /etc/fstab
+
+sudo systemctl daemon-reload
+sudo systemctl restart local-fs.target
+```
+
 ### Failure: mount or ownership operations fail
 Symptoms:
 - Errors during temporary mount, `chown`, or unmount
@@ -236,6 +238,37 @@ sudo ./scripts/automount-disks.sh
 
 If the disk is mounted at its expected managed path, the script repairs ownership in place. If it is mounted somewhere else, the script skips it and prints an informational message; unmount/remount to the managed path and rerun.
 
+### Failure: mount path exists but is not a directory
+Symptoms:
+- Script exits with `Mount path exists and is not a directory`
+
+Likely Causes:
+- A stale file or symlink already occupies the generated `/mnt/...` mount path
+- Manual cleanup left behind a non-directory placeholder
+
+Troubleshooting:
+```bash
+ls -ld "/mnt/<mount-path-from-error>"
+sudo rm -f "/mnt/<mount-path-from-error>"
+sudo ./scripts/automount-disks.sh
+```
+
+### Failure: generated /etc/fstab content fails validation
+Symptoms:
+- Script exits with `Generated /etc/fstab content failed validation for UUID=...`
+
+Likely Causes:
+- Existing manual edits left `/etc/fstab` in an invalid state
+- A conflicting entry or malformed option line was already present
+
+Troubleshooting:
+```bash
+sudo findmnt --verify --tab-file /etc/fstab
+sudo cp /etc/fstab.backup.<timestamp> /etc/fstab
+sudo systemctl daemon-reload
+sudo systemctl restart local-fs.target
+```
+
 ### Recovery: restore fstab backup
 If a generated entry is incorrect, restore backup and reload:
 
@@ -247,6 +280,23 @@ sudo systemctl restart local-fs.target
 ```
 
 ## scripts/install-docker.sh
+
+### Failure: install-docker rejects execution context or missing codename
+Symptoms:
+- Script asks for sudo/root privileges
+- Script exits because `/etc/os-release` cannot be read or `VERSION_CODENAME` is empty
+
+Likely Causes:
+- Script was run without root privileges
+- Host is not a Debian-style system release
+- `/etc/os-release` is missing or malformed
+
+Troubleshooting:
+```bash
+whoami
+cat /etc/os-release
+sudo ./scripts/install-docker.sh
+```
 
 ### Failure: Docker repository setup or package install fails
 Symptoms:
@@ -345,20 +395,6 @@ sudo apt-get -f install
 sudo ./scripts/install-labwc.sh
 ```
 
-### Failure: xwayland-disabled build still pulls X11-related errors
-Symptoms:
-- Meson configure fails around optional X11 support or xwayland symbols
-
-Likely Causes:
-- Outdated build directory from previous configuration
-- Source tree configured before xwayland was disabled
-
-Troubleshooting:
-```bash
-rm -rf /usr/local/src/labwc/build
-sudo ./scripts/install-labwc.sh
-```
-
 ### Failure: no configs copied
 Symptoms:
 - Install succeeds but expected files are missing under `${XDG_CONFIG_HOME:-$HOME/.config}/labwc`
@@ -390,6 +426,21 @@ unset LABWC_INSTALL_MODE
 sudo ./scripts/install-labwc.sh
 ```
 
+### Failure: LABWC_DOCKER_IMAGE is set but empty
+Symptoms:
+- Script exits with `LABWC_DOCKER_IMAGE is set but empty.`
+
+Likely Causes:
+- A wrapper script or shell profile exported an empty override value
+- CI or manual invocation passed `LABWC_DOCKER_IMAGE=` without a value
+
+Troubleshooting:
+```bash
+env | grep '^LABWC_DOCKER_IMAGE='
+unset LABWC_DOCKER_IMAGE
+sudo ./scripts/install-labwc.sh
+```
+
 ### Failure: docker-package mode cannot start Docker build
 Symptoms:
 - Docker-based build exits early before package build steps complete
@@ -397,6 +448,7 @@ Symptoms:
 Likely Causes:
 - Docker CLI is not installed or not in PATH
 - Docker daemon is not reachable
+- Host `/etc/os-release` is missing or does not define `VERSION_CODENAME`
 
 Troubleshooting:
 ```bash
@@ -428,6 +480,7 @@ Symptoms:
 
 Likely Causes:
 - Latest labwc tag requires a wlroots ABI not packaged in the selected container image
+- Upstream `meson.build` format changed and the wlroots ABI parser could not extract `wlroots-X.Y`
 - wlroots source fallback checkout fails for both `X.Y` and `X.Y.0` refs
 - wlroots source build/install completed but required pkg-config name is still not visible
 
@@ -441,6 +494,21 @@ grep -E 'wlroots-|libwlroots|pkg-config|checkout -f' /tmp/labwc-docker-build.log
 
 # If image is too old/new for required ABI, try a different Debian-compatible image
 sudo LABWC_INSTALL_MODE=docker-package LABWC_DOCKER_IMAGE=debian:trixie ./scripts/install-labwc.sh
+```
+
+### Failure: Docker-package build completes but no .deb is emitted
+Symptoms:
+- Script exits with `Docker build completed but no labwc .deb package was found in $build_dir.`
+
+Likely Causes:
+- `checkinstall` did not emit a package into the mounted artifacts directory
+- The container build failed after compilation but before packaging
+- The artifact volume was unavailable or the output path was changed
+
+Troubleshooting:
+```bash
+find /usr/local/src/labwc-docker-build -maxdepth 2 -type f \( -name 'labwc*.deb' -o -name '*.log' \)
+sudo LABWC_INSTALL_MODE=docker-package ./scripts/install-labwc.sh
 ```
 
 Operational note:

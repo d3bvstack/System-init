@@ -38,7 +38,7 @@ Side Effects:
 Idempotency:
 - Partially idempotent for package install/update steps
 - Not fully idempotent because it rewrites apt sources and reboots unconditionally
-- `group add seat` can fail if group already exists
+- `groupadd seat` can fail if the group already exists
 
 ## scripts/post-setup.sh
 
