@@ -144,7 +144,7 @@ Install labwc from Debian repos, build latest tagged release from source, or bui
 Inputs and Invocation:
 - Run as root via sudo from non-root account: `sudo ./scripts/install-labwc.sh`
 - Interactive prompt selects installation mode unless `LABWC_INSTALL_MODE` environment variable is set
-- Interactive prompt offers three choices: package, source, docker-package
+- Interactive prompt asks how labwc should be installed and offers three choices: install the Debian package from apt, build and install the latest upstream release from source, or build a Debian package in Docker and install it on the host
 - Uses `SUDO_USER` to determine target user context
 
 Required Environment:
@@ -152,7 +152,10 @@ Required Environment:
 - `apt-get`, `apt-mark`, `git`, `meson`, `ninja`, `install`, `ldconfig`
 - Network access to Debian repositories and `https://github.com/labwc/labwc`
 - Optional: `LABWC_INSTALL_MODE` — When set to `package`, `source`, or `docker-package`, skips interactive prompt. Any other value causes script to exit with error.
-- Docker-package mode also requires Docker CLI availability and a reachable Docker daemon.
+- Optional: `LABWC_DOCKER_IMAGE` — Overrides docker-package container image. Default is `debian:${VERSION_CODENAME}` resolved from host `/etc/os-release`. Empty value is rejected.
+- Docker-package mode also requires Docker CLI availability, a reachable Docker daemon, and outbound access from the container to Debian package mirrors plus:
+  - `https://github.com/labwc/labwc`
+  - `https://gitlab.freedesktop.org/wlroots/wlroots`
 
 Labwc Runtime Dependencies (Upstream Reference):
 - wlroots, wayland, libinput, xkbcommon
@@ -174,18 +177,25 @@ The script installs and then removes the following packages when building from s
 Note: Assume these package names are valid for Debian Trixie; verify availability for target release.
 
 Side Effects:
-- If `LABWC_INSTALL_MODE` not set, displays interactive prompt allowing user to select `package`, `source`, or `docker-package` mode
+- If `LABWC_INSTALL_MODE` is not set, displays an interactive prompt asking how labwc should be installed and allowing the user to select package, source, or docker-package mode
 - Package mode: installs `labwc` package through apt
 - Source mode: installs build dependencies, clones/fetches `https://github.com/labwc/labwc`, resolves latest release tag using `git tag --sort=-v:refname`, checks out tag, builds with `meson`/`ninja`, installs with `ninja install`, calls `ldconfig`
 - Source mode: configures Meson with `-Dxwayland=disabled`
 - Source mode: if the correct wlroots version is not available on the system, Meson may automatically download the wlroots repository as a subproject
 - Source mode: marks only newly-installed build dependencies as auto (preserves pre-existing manual installs), then runs `apt-get autoremove --purge -y`
-- Docker-package mode: builds a labwc `.deb` in a Debian container matching host `VERSION_CODENAME`, installs the resulting package on host, and retains build artifacts at `/usr/local/src/labwc-docker-build/<timestamp>/` (including `labwc*.deb`)
-- Deploys config files to `${XDG_CONFIG_HOME:-$HOME/.config}/labwc`: uses binary selection (not partial fallback) — if any candidate files exist in repo `.config/labwc`, copies matching files from there; otherwise, if zero files found in repo, attempts to copy matching files from `/usr/share/doc/labwc`
+- Docker-package mode: builds a labwc `.deb` in a Debian container using `LABWC_DOCKER_IMAGE` when set, otherwise `debian:${VERSION_CODENAME}`; installs the resulting package on host; retains build artifacts at `/usr/local/src/labwc-docker-build/<timestamp>/` (including `labwc*.deb`)
+- Docker-package mode: does not pre-install a fixed wlroots dev package name in container build deps
+- Docker-package mode: after checking out latest labwc tag, parses `/tmp/labwc/meson.build` for `wlroots-X.Y`, maps that to `libwlroots-X.Y-dev`, and attempts distro package install
+- Docker-package mode: if matching distro wlroots package is unavailable, clones `https://gitlab.freedesktop.org/wlroots/wlroots`, checks out ref `X.Y` (fallback `X.Y.0`), builds and installs wlroots in-container via meson+ninja, runs `ldconfig`, verifies pkg-config visibility, then proceeds with labwc build
+- Docker-package mode: still builds the Debian package with `checkinstall` and installs that package on the host via apt
+- Deploys config files to `${XDG_CONFIG_HOME:-$HOME/.config}/labwc`: if any candidate files exist in repo `.config/labwc`, copies matching files from there; otherwise, falls back to `/usr/share/doc/labwc` only when the `labwc` package is already installed and that directory exists
 - Config files targeted: `rc.xml`, `menu.xml`, `autostart`, `shutdown`, `environment`, `themerc-override`
 - Makes `autostart`, `shutdown`, and `environment` config files executable (chmod 755) after copying
 - Never overwrites existing destination files
 - Creates `/usr/local/src/labwc` directory if needed and clones source repository there
+
+Operational caveat:
+- `LABWC_DOCKER_IMAGE` should point to a trusted Debian-compatible image source to reduce supply-chain risk.
 
 Idempotency:
 - Package mode is mostly idempotent via apt
@@ -217,7 +227,7 @@ Idempotency:
 ## scripts/automount-disks.sh
 
 Purpose:
-Detect unmounted EXT4/NTFS partitions and configure systemd automount entries.
+Detect eligible EXT4/NTFS partitions and configure systemd automount entries.
 
 Inputs and Invocation:
 - Run via sudo from non-root account: `sudo ./scripts/automount-disks.sh`
@@ -232,13 +242,16 @@ Side Effects:
 - Creates backup `/etc/fstab.backup.<timestamp>`
 - Adds or updates entries in `/etc/fstab` for eligible devices
 - Creates mount directories under `/mnt`
-- Temporarily mounts EXT4 volumes to set the mount root ownership for the invoking sudo user
+- Enforces EXT4 mount-root ownership for managed disks on every run (including disks already mounted at their expected managed path)
 - Maps NTFS ownership with `uid=`, `gid=`, and `umask=022`
+- Uses `ntfs3` when available, otherwise `ntfs-3g` when helpers are found (`/sbin/mount.ntfs-3g`, `/usr/sbin/mount.ntfs-3g`, `/sbin/mount.ntfs`, `/usr/sbin/mount.ntfs`, then `command -v` fallback)
+- Warns once when neither `ntfs3` nor `ntfs-3g` support is available, then skips NTFS volumes
+- Skips devices already mounted somewhere other than their expected managed mount path, with an informational message
 - Reloads systemd daemon state after changes
 
 Idempotency:
 - Checks existing UUID entries in `/etc/fstab` before appending
-- Generally idempotent for previously configured disks
+- Generally idempotent for previously configured disks; EXT4 ownership repair may still run without changing `/etc/fstab`
 - New disks produce new state changes
 
 ## scripts/install-docker.sh

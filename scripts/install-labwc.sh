@@ -13,6 +13,7 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 LABWC_REPO_URL="https://github.com/labwc/labwc"
 LABWC_REPO_CLONE_DIR="/usr/local/src/labwc"
 LABWC_DOCKER_BUILD_ROOT="/usr/local/src/labwc-docker-build"
+WLR_REPO_URL="https://gitlab.freedesktop.org/wlroots/wlroots"
 
 DOCKER_BUILD_DEPS=(
     "ca-certificates"
@@ -25,12 +26,35 @@ DOCKER_BUILD_DEPS=(
     "checkinstall"
     "libwayland-dev"
     "wayland-protocols"
-    "libwlroots-dev"
     "libpixman-1-dev"
     "libxkbcommon-dev"
     "libxml2-dev"
     "libpango1.0-dev"
     "libcairo2-dev"
+)
+
+DOCKER_WLROOTS_SOURCE_DEPS=(
+    "bison"
+    "flex"
+    "libdrm-dev"
+    "libinput-dev"
+    "libseat-dev"
+    "libdisplay-info-dev"
+    "libliftoff-dev"
+    "hwdata"
+    "libegl1-mesa-dev"
+    "libgles2-mesa-dev"
+    "libgbm-dev"
+    "libxcb-ewmh-dev"
+    "libxcb-icccm4-dev"
+    "libxcb-errors-dev"
+    "libxcb-render-util0-dev"
+    "libxcb-composite0-dev"
+    "libxcb-xfixes0-dev"
+    "libxcb-randr0-dev"
+    "libxcb-xinput-dev"
+    "libxcb-res0-dev"
+    "libxcb-dri3-dev"
 )
 
 # Require root privileges because this script installs packages and writes system paths.
@@ -84,11 +108,11 @@ prompt_install_mode() {
 
     while [[ -z "$mode" ]]; do
         echo
-        echo "Select labwc installation mode:"
-        echo "1) Install distro package (apt install labwc)"
-        echo "2) Build latest release from source ($LABWC_REPO_URL)"
-        echo "3) Build .deb in Docker, then install package on host"
-        read -r -p "Enter selection [1-3]: " choice
+        echo "How should labwc be installed on this system?"
+        echo "1) Install the Debian package from apt"
+        echo "2) Build and install the latest upstream release from source"
+        echo "3) Build a Debian package in Docker, then install it on the host"
+        read -r -p "Choose an option [1-3]: " choice
 
         case "$choice" in
             1)
@@ -198,7 +222,12 @@ install_from_docker_package() {
         return 1
     fi
 
-    docker_image="debian:${codename}"
+    docker_image="${LABWC_DOCKER_IMAGE:-debian:${codename}}"
+    if [[ -z "$docker_image" ]]; then
+        echo "ERROR: LABWC_DOCKER_IMAGE is set but empty."
+        return 1
+    fi
+
     build_stamp="$(date +%Y%m%d-%H%M%S)"
     build_dir="$LABWC_DOCKER_BUILD_ROOT/$build_stamp"
 
@@ -208,7 +237,9 @@ install_from_docker_package() {
     docker run --rm \
         -e DEBIAN_FRONTEND=noninteractive \
         -e LABWC_REPO_URL="$LABWC_REPO_URL" \
+        -e WLR_REPO_URL="$WLR_REPO_URL" \
         -e DOCKER_BUILD_DEPS="${DOCKER_BUILD_DEPS[*]}" \
+        -e DOCKER_WLROOTS_SOURCE_DEPS="${DOCKER_WLROOTS_SOURCE_DEPS[*]}" \
         -v "$build_dir:/artifacts" \
         "$docker_image" \
         bash -lc '
@@ -224,6 +255,41 @@ install_from_docker_package() {
             fi
 
             git -C /tmp/labwc checkout -f "$latest_tag"
+
+            required_wlroots_dep="$(grep -o "wlroots-[0-9.]*" -m1 /tmp/labwc/meson.build || true)"
+            if [[ -z "$required_wlroots_dep" ]]; then
+                echo "ERROR: Could not determine required wlroots ABI from /tmp/labwc/meson.build."
+                exit 1
+            fi
+
+            required_wlroots_pkg="lib${required_wlroots_dep}-dev"
+            if apt-cache show "$required_wlroots_pkg" >/dev/null 2>&1; then
+                echo ">> Installing distro wlroots package: $required_wlroots_pkg"
+                apt-get install -y --no-install-recommends "$required_wlroots_pkg"
+            else
+                wlroots_ref="${required_wlroots_dep#wlroots-}"
+                echo ">> Distro package $required_wlroots_pkg is unavailable. Building wlroots from source (ref: $wlroots_ref)."
+                apt-get install -y --no-install-recommends $DOCKER_WLROOTS_SOURCE_DEPS
+
+                git clone "$WLR_REPO_URL" /tmp/wlroots
+                if ! git -C /tmp/wlroots checkout -f "$wlroots_ref"; then
+                    if ! git -C /tmp/wlroots checkout -f "${wlroots_ref}.0"; then
+                        echo "ERROR: Could not checkout wlroots ref $wlroots_ref or ${wlroots_ref}.0"
+                        exit 1
+                    fi
+                fi
+
+                meson setup /tmp/wlroots/build /tmp/wlroots -Dexamples=false -Dxwayland=disabled
+                ninja -C /tmp/wlroots/build
+                ninja -C /tmp/wlroots/build install
+                ldconfig
+
+                if ! pkg-config --exists "$required_wlroots_dep"; then
+                    echo "ERROR: wlroots build/install succeeded but pkg-config cannot find $required_wlroots_dep"
+                    exit 1
+                fi
+            fi
+
             meson setup /tmp/labwc/build /tmp/labwc --buildtype=release -Dxwayland=disabled
             ninja -C /tmp/labwc/build
 
@@ -266,6 +332,11 @@ copy_if_missing() {
     echo ">> Installed config file: $dest_file"
 }
 
+labwc_package_is_installed() {
+    # Check the installed package database before using package-provided defaults.
+    dpkg-query -W -f='${Status}' labwc 2>/dev/null | grep -q '^install ok installed$'
+}
+
 copy_labwc_configs() {
     # Prefer repository config overrides, then fall back to distro defaults.
     local copied=0
@@ -285,13 +356,17 @@ copy_labwc_configs() {
     fi
 
     if [[ "$found_repo_files" -eq 0 ]]; then
-        echo ">> No labwc config files found in repo .config/labwc, using defaults from $DEFAULT_LABWC_CONFIG_DIR"
-        for file_name in "${LABWC_CONFIG_FILES[@]}"; do
-            if [[ -f "$DEFAULT_LABWC_CONFIG_DIR/$file_name" ]]; then
-                copy_if_missing "$DEFAULT_LABWC_CONFIG_DIR/$file_name" "$TARGET_LABWC_CONFIG_DIR/$file_name"
-                copied=1
-            fi
-        done
+        if labwc_package_is_installed && [[ -d "$DEFAULT_LABWC_CONFIG_DIR" ]]; then
+            echo ">> No labwc config files found in repo .config/labwc, using defaults from $DEFAULT_LABWC_CONFIG_DIR"
+            for file_name in "${LABWC_CONFIG_FILES[@]}"; do
+                if [[ -f "$DEFAULT_LABWC_CONFIG_DIR/$file_name" ]]; then
+                    copy_if_missing "$DEFAULT_LABWC_CONFIG_DIR/$file_name" "$TARGET_LABWC_CONFIG_DIR/$file_name"
+                    copied=1
+                fi
+            done
+        else
+            echo ">> No labwc config files found in repo .config/labwc, and package defaults are unavailable until labwc is installed."
+        fi
     fi
 
     if [[ "$copied" -eq 0 ]]; then

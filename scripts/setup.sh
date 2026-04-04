@@ -49,6 +49,7 @@ sudo apt-get install -y \
     firmware-realtek \
     bluez bluetooth bluez-tools ddcutil playerctl git \
     seatd foot bemenu \
+    ntfs-3g \
     pipewire pipewire-audio pipewire-pulse wireplumber \
     gnome-keyring libsecret-1-0 libsecret-tools libpam-gnome-keyring \
     wget gpg apt-transport-https

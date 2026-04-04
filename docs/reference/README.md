@@ -16,9 +16,9 @@ Quick links:
 - [scripts/setup.sh](script-contracts.md#scriptssetupsh) — Base system bootstrap and reboot
 - [scripts/post-setup.sh](script-contracts.md#scriptspost-setupsh) — Post-reboot dispatcher
 - [scripts/onboot-update.sh](script-contracts.md#scriptsonboot-updatesh) — 12-hour debounced updater
-- [scripts/automount-disks.sh](script-contracts.md#scriptsautomount-diskssh) — Detect and automount EXT4/NTFS
+- [scripts/automount-disks.sh](script-contracts.md#scriptsautomount-diskssh) — Detect and automount eligible EXT4/NTFS disks
 - [scripts/install-docker.sh](script-contracts.md#scriptsinstall-dockersh) — Install Docker from the official apt repository
-- [scripts/install-labwc.sh](script-contracts.md#scriptsinstall-labwcsh) — Install labwc from package or source and deploy config
+- [scripts/install-labwc.sh](script-contracts.md#scriptsinstall-labwcsh) — Install labwc from package, source, or Docker-built package and deploy config
 - [systemd/onboot-update.service](script-contracts.md#systemdonboot-updateservice) — Service unit and hardening policy
 
 Hooks:
@@ -43,6 +43,7 @@ See the [Failure Modes & Troubleshooting](troubleshooting.md) reference, organiz
 
 **Disk Automounting:**
 - [no disks configured](troubleshooting.md#failure-no-disks-configured)
+- [NTFS disks skipped](troubleshooting.md#warning-ntfs-disks-skipped)
 - [mount or ownership failures](troubleshooting.md#failure-mount-or-ownership-operations-fail)
 - [restore from fstab backup](troubleshooting.md#recovery-restore-fstab-backup)
 

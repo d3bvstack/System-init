@@ -125,7 +125,9 @@ Symptoms:
 Likely Causes:
 - No unmounted EXT4/NTFS disks detected
 - Existing UUIDs already present in `/etc/fstab`
+- Devices are already mounted at non-managed paths and were skipped by design
 - The current mount point is already occupied or invalid
+- NTFS disks were detected but the host does not provide `ntfs3` or `ntfs-3g`, so they were skipped with a warning
 
 Troubleshooting:
 ```bash
@@ -133,6 +135,37 @@ lsblk -f
 grep -E 'UUID=.*(ext4|ntfs|ntfs3)' /etc/fstab
 findmnt --mountpoint "/mnt/your-mount-point"
 ```
+
+Expected informational output can include skip messages such as:
+- `Skipping /dev/... - mounted at /boot/efi (expected managed path: /mnt/...)`
+- `Skipping /dev/... - mounted at / (expected managed path: /mnt/...)`
+- `Skipping /dev/... - mounted at /run/media/... (expected managed path: /mnt/...)`
+
+These are normal when the partition is already mounted elsewhere (for example system partitions or LVM-backed filesystems mounted by the OS).
+
+### Warning: NTFS disks skipped
+Symptoms:
+- Script reports that NTFS support is unavailable
+
+Likely Causes:
+- The kernel lacks `ntfs3`
+- The `ntfs-3g` userspace helper is not installed
+- Helper binaries exist only in non-standard locations that are not in probe paths/PATH
+
+Troubleshooting:
+```bash
+command -v mount.ntfs-3g || command -v mount.ntfs
+grep -qw ntfs3 /proc/filesystems
+```
+
+The script checks for helpers in this order:
+1. `/sbin/mount.ntfs-3g`
+2. `/usr/sbin/mount.ntfs-3g`
+3. `/sbin/mount.ntfs`
+4. `/usr/sbin/mount.ntfs`
+5. `command -v mount.ntfs-3g` or `command -v mount.ntfs`
+
+If your distro installs helpers in a different location, add that location to `PATH` for the sudo environment or install/link the helper in a standard `sbin` path.
 
 ### Failure: mount or ownership operations fail
 Symptoms:
@@ -151,6 +184,14 @@ sudo mount | grep /mnt/
 sudo fsck -N /dev/<device>
 findmnt --mountpoint "/mnt/your-mount-point"
 ```
+
+For EXT4, the script intentionally sets mount-root ownership on each run. If access fails with `Permission denied` because the mount root is owned by `root:root`, rerun:
+
+```bash
+sudo ./scripts/automount-disks.sh
+```
+
+If the disk is mounted at its expected managed path, the script repairs ownership in place. If it is mounted somewhere else, the script skips it and prints an informational message; unmount/remount to the managed path and rerun.
 
 ### Recovery: restore fstab backup
 If a generated entry is incorrect, restore backup and reload:
@@ -280,12 +321,14 @@ Symptoms:
 - Install succeeds but expected files are missing under `${XDG_CONFIG_HOME:-$HOME/.config}/labwc`
 
 Likely Causes:
-- No matching files in repo `.config/labwc`
-- `/usr/share/doc/labwc` does not include expected defaults for current package version
+- No matching files exist in repo `.config/labwc`
+- The `labwc` package is not installed yet, so `/usr/share/doc/labwc` is unavailable
+- The installed `labwc` package does not ship the expected default files for this release
 
 Troubleshooting:
 ```bash
 ls -la .config/labwc
+apt-cache policy labwc
 ls -la /usr/share/doc/labwc
 ls -la "${XDG_CONFIG_HOME:-$HOME/.config}/labwc"
 ```
@@ -334,6 +377,57 @@ docker run --rm debian:trixie apt-get update
 curl -I https://github.com/labwc/labwc
 sudo ./scripts/install-labwc.sh
 ```
+
+### Failure: docker-package latest tag fails due wlroots ABI mismatch
+Symptoms:
+- Docker-package mode reaches Meson configure/build for labwc, then fails with wlroots package/version errors
+- Output indicates missing pkg-config entry for `wlroots-X.Y` or missing `libwlroots-X.Y-dev`
+
+Likely Causes:
+- Latest labwc tag requires a wlroots ABI not packaged in the selected container image
+- wlroots source fallback checkout fails for both `X.Y` and `X.Y.0` refs
+- wlroots source build/install completed but required pkg-config name is still not visible
+
+Troubleshooting:
+```bash
+# Re-run in docker-package mode and capture logs
+sudo LABWC_INSTALL_MODE=docker-package ./scripts/install-labwc.sh 2>&1 | tee /tmp/labwc-docker-build.log
+
+# Inspect detected ABI and wlroots steps in log
+grep -E 'wlroots-|libwlroots|pkg-config|checkout -f' /tmp/labwc-docker-build.log
+
+# If image is too old/new for required ABI, try a different Debian-compatible image
+sudo LABWC_INSTALL_MODE=docker-package LABWC_DOCKER_IMAGE=debian:trixie ./scripts/install-labwc.sh
+```
+
+Operational note:
+- The script already handles ABI detection and source fallback automatically. Persistent failure usually indicates mirror/network restrictions, missing source-build prerequisites in the image, or upstream ref availability issues.
+
+### Failure: container image pull blocked; use LABWC_DOCKER_IMAGE mirror
+Symptoms:
+- Docker-package mode fails before build steps with image pull/auth/network errors
+- Default image `debian:${VERSION_CODENAME}` cannot be pulled from current environment
+
+Likely Causes:
+- Registry egress restrictions or DNS/proxy policy blocks default registry path
+- Environment requires an internal or mirrored registry endpoint
+
+Troubleshooting:
+```bash
+# Verify daemon access first
+docker info
+
+# Test pull from your approved mirror image
+sudo docker pull mirror.gcr.io/library/debian:trixie
+
+# Re-run using mirror override
+sudo LABWC_INSTALL_MODE=docker-package \
+	LABWC_DOCKER_IMAGE=mirror.gcr.io/library/debian:trixie \
+	./scripts/install-labwc.sh
+```
+
+Security/operational caveat:
+- Use only trusted, Debian-compatible mirror images. Untrusted images can change build inputs and package contents.
 
 ### Failure: Git tag resolution or clone fails
 Symptoms:

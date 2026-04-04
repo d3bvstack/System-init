@@ -113,13 +113,16 @@ After reboot, log back in and continue with stage two.
 - Installs `onboot-update.sh` to `/usr/local/sbin/onboot-update.sh`.
 - Installs `onboot-update.service` to `/etc/systemd/system/onboot-update.service`.
 - Reloads systemd and enables `onboot-update.service`.
-- May add or update `/etc/fstab` entries for detected unmounted EXT4/NTFS disks; ext4 volumes are mounted once to set mount-root ownership for the invoking sudo user, and NTFS entries map ownership with `uid=`/`gid=`.
+- May add or update `/etc/fstab` entries for eligible EXT4/NTFS disks; EXT4 mount-root ownership is enforced for managed disks on every run, and NTFS entries map ownership with `uid=`/`gid=`.
 - Creates `/etc/fstab.backup.<timestamp>` before writing fstab changes.
 - Reloads systemd after automount changes are written so newly created or updated automount units are recognized.
 - Installs Docker Engine and plugins from Docker's official apt repository.
 - Prompts for labwc install mode (Debian package, latest source build, or docker-package), unless `LABWC_INSTALL_MODE` environment variable is set to skip prompt.
-- Docker-package mode builds a labwc `.deb` in a Debian container matching host `VERSION_CODENAME`, then installs the resulting package on the host.
-- Docker-package mode requires Docker CLI availability, a reachable Docker daemon, and network access for container apt operations and GitHub clone.
+- Docker-package mode builds a labwc `.deb` in a Debian container matching host `VERSION_CODENAME` (override with `LABWC_DOCKER_IMAGE`), then installs the resulting package on the host.
+- Docker-package mode checks out the latest labwc tag, reads `meson.build` to detect the required wlroots ABI name (`wlroots-X.Y`), and tries to install matching container package `libwlroots-X.Y-dev`.
+- If the matching wlroots dev package is unavailable in the container image, docker-package mode builds wlroots from source in-container from `https://gitlab.freedesktop.org/wlroots/wlroots` using ref `X.Y` (fallback `X.Y.0`), installs it, then continues the labwc package build.
+- Docker-package mode requires Docker CLI availability, a reachable Docker daemon, and network access for container apt operations plus Git access to `https://github.com/labwc/labwc` and `https://gitlab.freedesktop.org/wlroots/wlroots`.
+- For restricted networks, set `LABWC_DOCKER_IMAGE` to an internally reachable Debian-compatible mirror image before running post-setup.
 - Source mode installs build dependencies transiently, then removes only newly-added packages via `apt-mark auto` (preserves pre-existing manual package installs).
 - Deploys labwc config files to `${XDG_CONFIG_HOME:-$HOME/.config}/labwc`: uses binary selection to copy from repo `.config/labwc` if it contains any candidate files; otherwise attempts `/usr/share/doc/labwc` as fallback. Never overwrites existing files.
 - Source mode builds labwc with xwayland disabled and may let Meson download wlroots automatically when the required system version is unavailable.
@@ -175,7 +178,7 @@ curl -sSL https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts
 ```
 
 **Configure disk automounting only:**
-Downloads and runs the automount script, which detects unmounted EXT4/NTFS disks, requires `findmnt` and systemd, and adds or updates automount entries in `/etc/fstab`.
+Downloads and runs the automount script, which detects eligible EXT4/NTFS disks, requires `findmnt` and systemd, and adds or updates automount entries in `/etc/fstab`.
 ```bash
 curl -sSL https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts/automount-disks.sh | sudo bash
 ```

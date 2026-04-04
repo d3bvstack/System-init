@@ -63,7 +63,9 @@ get_ntfs_fstype() {
         return 0
     fi
 
-    if command -v mount.ntfs-3g >/dev/null 2>&1 || command -v mount.ntfs >/dev/null 2>&1; then
+    if [[ -x /sbin/mount.ntfs-3g ]] || [[ -x /usr/sbin/mount.ntfs-3g ]] || \
+       [[ -x /sbin/mount.ntfs ]] || [[ -x /usr/sbin/mount.ntfs ]] || \
+       command -v mount.ntfs-3g >/dev/null 2>&1 || command -v mount.ntfs >/dev/null 2>&1; then
         printf '%s' "ntfs-3g"
         return 0
     fi
@@ -111,21 +113,30 @@ set_ext4_mount_owner() {
     local mount_dir="$2"
     local owner_uid="$3"
     local owner_gid="$4"
+    local was_mounted=0
 
-    if ! mount "$dev" "$mount_dir"; then
-        echo "ERROR: Failed to mount $dev on $mount_dir for ownership setup."
-        return 1
+    if findmnt --mountpoint "$mount_dir" >/dev/null 2>&1; then
+        was_mounted=1
+    else
+        if ! mount "$dev" "$mount_dir"; then
+            echo "ERROR: Failed to mount $dev on $mount_dir for ownership setup."
+            return 1
+        fi
     fi
 
     if ! chown "$owner_uid":"$owner_gid" "$mount_dir"; then
         echo "ERROR: Failed to set ownership on $mount_dir."
-        umount "$mount_dir" >/dev/null 2>&1 || true
+        if [[ "$was_mounted" -eq 0 ]]; then
+            umount "$mount_dir" >/dev/null 2>&1 || true
+        fi
         return 1
     fi
 
-    if ! umount "$mount_dir"; then
-        echo "ERROR: Failed to unmount $mount_dir after ownership setup."
-        return 1
+    if [[ "$was_mounted" -eq 0 ]]; then
+        if ! umount "$mount_dir"; then
+            echo "ERROR: Failed to unmount $mount_dir after ownership setup."
+            return 1
+        fi
     fi
 
     return 0
@@ -182,8 +193,7 @@ upsert_fstab_entry() {
 
 NTFS_FSTYPE=""
 if ! NTFS_FSTYPE=$(get_ntfs_fstype); then
-    echo "ERROR: Neither ntfs3 kernel support nor ntfs-3g userspace support is available."
-    exit 1
+    echo ">> Warning: Neither ntfs3 kernel support nor ntfs-3g userspace support is available. NTFS disks will be skipped."
 fi
 
 # Scan block devices in key-value mode so labels with spaces parse reliably.
@@ -206,8 +216,8 @@ while IFS= read -r line; do
     [[ "$line" =~ $re_label ]] && LABEL="${BASH_REMATCH[1]}"
     [[ "$line" =~ $re_mountpoint ]] && MOUNTPOINT="${BASH_REMATCH[1]}"
 
-    # Skip devices without UUIDs and anything already mounted.
-    if [ -z "$UUID" ] || [ -n "$MOUNTPOINT" ]; then
+    # Skip devices without UUIDs.
+    if [ -z "$UUID" ]; then
         continue
     fi
 
@@ -220,14 +230,23 @@ while IFS= read -r line; do
         MOUNT_DIR="/mnt/${SAFE_LABEL}-${UUID:0:8}"
     fi
 
+    # Only manage mounted devices when they are mounted at the expected path.
+    if [[ -n "$MOUNTPOINT" && "$MOUNTPOINT" != "$MOUNT_DIR" ]]; then
+        echo ">> Skipping $DEV - mounted at $MOUNTPOINT (expected managed path: $MOUNT_DIR)."
+        continue
+    fi
+
     if [[ -e "$MOUNT_DIR" && ! -d "$MOUNT_DIR" ]]; then
         echo "ERROR: Mount path exists and is not a directory: $MOUNT_DIR"
         exit 1
     fi
 
     if findmnt --mountpoint "$MOUNT_DIR" >/dev/null 2>&1; then
-        echo ">> Skipping $DEV - mount point $MOUNT_DIR is already in use."
-        continue
+        CURRENT_SOURCE=$(findmnt -n -o SOURCE --mountpoint "$MOUNT_DIR" 2>/dev/null || true)
+        if [[ "$CURRENT_SOURCE" != "$DEV" && "$CURRENT_SOURCE" != "/dev/disk/by-uuid/$UUID" ]]; then
+            echo ">> Skipping $DEV - mount point $MOUNT_DIR is in use by $CURRENT_SOURCE."
+            continue
+        fi
     fi
 
     # Write filesystem-specific automount entries.
@@ -243,17 +262,20 @@ while IFS= read -r line; do
         # Mount on access, do not mount at boot, and unmount after idle timeout.
         FSTAB_ENTRY="UUID=$UUID  $MOUNT_DIR  ext4  defaults,noatime,nofail,noauto,users,x-systemd.automount,x-systemd.idle-timeout=15min,x-gvfs-show,x-gvfs-name=$SAFE_LABEL  0  0"
         UPSERT_RESULT=$(upsert_fstab_entry "$UUID" "$FSTAB_ENTRY")
-        if [[ "$UPSERT_RESULT" == "added" ]]; then
-            # Mount briefly to set the mount root ownership, then unmount.
-            if ! set_ext4_mount_owner "$DEV" "$MOUNT_DIR" "$ACTUAL_UID" "$ACTUAL_GID"; then
-                exit 1
-            fi
+        # Ensure ext4 mount root ownership matches the invoking user each run.
+        if ! set_ext4_mount_owner "$DEV" "$MOUNT_DIR" "$ACTUAL_UID" "$ACTUAL_GID"; then
+            exit 1
         fi
         if [[ "$UPSERT_RESULT" != "unchanged" ]]; then
             echo ">> ${UPSERT_RESULT^} /etc/fstab entry for UUID=$UUID."
         fi
 
     elif [[ "$FSTYPE" == "ntfs" || "$FSTYPE" == "ntfs3" ]]; then
+        if [[ -z "$NTFS_FSTYPE" ]]; then
+            echo ">> Skipping $DEV - NTFS support is not available on this host."
+            continue
+        fi
+
         echo ">> Found NTFS drive on $DEV. Configuring automount..."
         mkdir -p "$MOUNT_DIR"
 
