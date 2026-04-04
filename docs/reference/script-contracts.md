@@ -21,10 +21,16 @@ Required Environment:
 - `apt-get`, `systemctl`, `wget`, `gpg`, `pam-auth-update`
 - Network connectivity to Debian and Microsoft package repositories
 
+Note:
+- `initramfs-tools` is installed by the script before `update-initramfs` is invoked.
+
 Side Effects:
 - Rewrites `/etc/apt/sources.list`
 - Installs and upgrades packages
 - Enables `bluetooth` and `seatd`
+- Writes `/etc/modprobe.d/btusb.conf` to disable `btusb` autosuspend
+- Updates `/etc/initramfs-tools/initramfs.conf` to use `MODULES=dep`
+- Rebuilds the current initramfs with `update-initramfs`
 - Adds target user to `video`, `render`, and `seat`
 - Installs VS Code Insiders repository and package
 - Performs cleanup and triggers reboot

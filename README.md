@@ -84,6 +84,7 @@ chmod +x scripts/*.sh post-setup/hooks/*.sh
 - Rewrites `/etc/apt/sources.list` for Trixie repositories.
 - Runs `apt-get update` and `apt-get full-upgrade -y`.
 - Installs system packages and enables services.
+- Disables `btusb` autosuspend, switches initramfs module policy to `MODULES=dep`, and rebuilds the current initramfs before rebooting.
 - Adds the invoking sudo user to `video`, `render`, and `seat` groups.
 - Installs `code-insiders` and its apt source.
 - Reboots automatically after a 5-second delay.
@@ -172,7 +173,7 @@ sudo ./scripts/post-setup.sh
 Only self-contained scripts should be run remotely. Each command block below shows what it will execute:
 
 **Bootstrap the base system (stage one only):**
-Downloads and runs the main setup script, which configures repositories, installs core packages, and reboots.
+Downloads and runs the main setup script, which configures repositories, installs core packages, applies the boot-time Bluetooth and initramfs fixes, and reboots.
 ```bash
 curl -sSL https://raw.githubusercontent.com/d3bvstack/System-init/master/scripts/setup.sh | sudo bash
 ```

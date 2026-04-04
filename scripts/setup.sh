@@ -48,6 +48,7 @@ sudo apt-get install -y \
     firmware-amd-graphics libgl1-mesa-dri libglx-mesa0 mesa-utils mesa-vulkan-drivers \
     firmware-realtek \
     bluez bluetooth bluez-tools ddcutil playerctl git \
+    initramfs-tools \
     seatd foot bemenu \
     ntfs-3g \
     pipewire pipewire-audio pipewire-pulse wireplumber \
@@ -59,6 +60,24 @@ echo ">> Enabling system services and configuring groups..."
 sudo systemctl enable --now bluetooth seatd
 sudo groupadd seat
 sudo usermod -aG video,render,seat "$ACTUAL_USER"
+
+# Apply the boot-time fixes before the first reboot.
+echo ">> Applying boot-time stability fixes..."
+cat <<'EOF' | sudo tee /etc/modprobe.d/btusb.conf > /dev/null
+options btusb enable_autosuspend=n
+EOF
+
+if [ -w /sys/module/btusb/parameters/enable_autosuspend ]; then
+    echo N | sudo tee /sys/module/btusb/parameters/enable_autosuspend > /dev/null
+fi
+
+if grep -Eq '^[#[:space:]]*MODULES=' /etc/initramfs-tools/initramfs.conf; then
+    sudo sed -i 's/^[#[:space:]]*MODULES=.*/MODULES=dep/' /etc/initramfs-tools/initramfs.conf
+else
+    echo 'MODULES=dep' | sudo tee -a /etc/initramfs-tools/initramfs.conf > /dev/null
+fi
+
+sudo update-initramfs -u -k "$(uname -r)"
 
 # Enable user-level PipeWire services by setting the user's runtime directory.
 echo ">> Enabling Pipewire for user $ACTUAL_USER..."

@@ -51,6 +51,25 @@ sudo apt-get update
 sudo apt-get install -y code-insiders
 ```
 
+### Failure: boot-time fixes do not rebuild
+Symptoms:
+- `update-initramfs` exits non-zero
+- The initramfs still reflects the old module policy after setup
+- `btusb` autosuspend does not appear disabled in the new boot environment
+
+Likely Causes:
+- `initramfs-tools` is missing or broken
+- The current kernel image is not installed correctly
+- The `btusb` module is not loaded yet, so the runtime sysfs parameter is absent
+
+Troubleshooting:
+```bash
+command -v update-initramfs
+grep -n '^MODULES=' /etc/initramfs-tools/initramfs.conf
+ls /sys/module/btusb/parameters/ 2>/dev/null
+sudo update-initramfs -u -k "$(uname -r)"
+```
+
 ## Stage 2: scripts/post-setup.sh
 
 ### Failure: post-setup dispatcher rejects execution context
