@@ -52,6 +52,7 @@ sudo apt-get install -y \
     seatd foot bemenu \
     ntfs-3g \
     pipewire pipewire-audio pipewire-pulse wireplumber \
+    mate-polkit \
     gnome-keyring libsecret-1-0 libsecret-tools libpam-gnome-keyring \
     wget gpg apt-transport-https
 
@@ -83,6 +84,15 @@ sudo update-initramfs -u -k "$(uname -r)"
 echo ">> Enabling Pipewire for user $ACTUAL_USER..."
 sudo -u "$ACTUAL_USER" XDG_RUNTIME_DIR="/run/user/$ACTUAL_UID" \
     systemctl --user enable --now pipewire pipewire-pulse wireplumber
+
+# Enable a login-time PolicyKit agent so GUI mount requests can authenticate without labwc autostart.
+echo ">> Enabling PolicyKit authentication agent for user $ACTUAL_USER..."
+sudo install -Dm644 systemd/polkit-mate-authentication-agent-1.service \
+    /etc/systemd/user/polkit-mate-authentication-agent-1.service
+sudo -u "$ACTUAL_USER" XDG_RUNTIME_DIR="/run/user/$ACTUAL_UID" \
+    systemctl --user daemon-reload
+sudo -u "$ACTUAL_USER" XDG_RUNTIME_DIR="/run/user/$ACTUAL_UID" \
+    systemctl --user enable --now polkit-mate-authentication-agent-1.service
 
 # Enable GNOME Keyring integration through Debian PAM tooling.
 echo ">> Configuring PAM for Gnome Keyring..."

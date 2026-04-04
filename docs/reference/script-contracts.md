@@ -32,6 +32,7 @@ Side Effects:
 - Updates `/etc/initramfs-tools/initramfs.conf` to use `MODULES=dep`
 - Rebuilds the current initramfs with `update-initramfs`
 - Adds target user to `video`, `render`, and `seat`
+- Installs `mate-polkit` and enables a user systemd service so the PolicyKit authentication agent starts on user login, independent of window manager/compositor autostart
 - Installs VS Code Insiders repository and package
 - Performs cleanup and triggers reboot
 

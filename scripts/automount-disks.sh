@@ -259,7 +259,7 @@ while IFS= read -r line; do
         echo ">> Found EXT4 drive on $DEV. Configuring automount..."
         mkdir -p "$MOUNT_DIR"
 
-        # Mount on access, do not mount at boot, and unmount after idle timeout.
+        # Mount on access, then unmount after 15 minutes of idle time.
         FSTAB_ENTRY="UUID=$UUID  $MOUNT_DIR  ext4  defaults,noatime,nofail,noauto,users,x-systemd.automount,x-systemd.idle-timeout=15min,x-gvfs-show,x-gvfs-name=$SAFE_LABEL  0  0"
         UPSERT_RESULT=$(upsert_fstab_entry "$UUID" "$FSTAB_ENTRY")
         # Ensure ext4 mount root ownership matches the invoking user each run.

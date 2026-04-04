@@ -186,6 +186,28 @@ The script checks for helpers in this order:
 
 If your distro installs helpers in a different location, add that location to `PATH` for the sudo environment or install/link the helper in a standard `sbin` path.
 
+### Failure: GUI mount says not authorized
+Symptoms:
+- Thunar or another file manager shows `Not authorized to perform operation` when opening a managed disk after it idles out
+- The disk mounts from `udisksctl` only after an authentication prompt, or works in a terminal but not from the desktop
+
+Likely Causes:
+- A PolicyKit authentication agent is not installed or not running in the user session
+- The current login session has no active user-level polkit agent to answer the mount request
+
+Troubleshooting:
+```bash
+systemctl --user status polkit-mate-authentication-agent-1.service
+systemctl --user show-environment | grep -E '^(DISPLAY|WAYLAND_DISPLAY|DBUS_SESSION_BUS_ADDRESS)='
+dpkg -l mate-polkit
+```
+
+Recovery:
+```bash
+# Reinstall the desktop baseline so the login-time PolicyKit agent is enabled.
+sudo ./scripts/setup.sh
+```
+
 ### Recovery: legacy NTFS entry still uses `users`
 Symptoms:
 - A desktop file manager shows a permission error when opening a managed NTFS mount created by an older script version

@@ -1,0 +1,11 @@
+[Unit]
+Description=PolicyKit authentication agent
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/polkit-mate-authentication-agent-1
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

@@ -55,6 +55,7 @@ What this repository does:
 
 - Configures Debian Trixie package sources and installs desktop-focused packages.
 - Enables core services (`bluetooth`, `seatd`) and user group mappings.
+- Starts a login-time PolicyKit authentication agent so file-manager mount prompts can authenticate without compositor-specific autostart.
 - Installs and enables an on-boot update service.
 - Configures on-demand automount for detected unmounted EXT4/NTFS disks.
 - Installs Docker from the official Docker apt repository.
