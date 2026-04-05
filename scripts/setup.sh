@@ -46,6 +46,7 @@ sudo apt-get full-upgrade -y
 echo ">> Installing core packages..."
 sudo apt-get install -y \
     firmware-amd-graphics libgl1-mesa-dri libglx-mesa0 mesa-utils mesa-vulkan-drivers \
+    build-essential clang valgrind \
     firmware-realtek \
     bluez bluetooth bluez-tools ddcutil playerctl git \
     initramfs-tools \
