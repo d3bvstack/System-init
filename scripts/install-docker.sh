@@ -60,6 +60,29 @@ apt-get update
 echo ">> Installing Docker packages..."
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
+# Add the invoking non-root user to the docker group for rootless docker CLI usage.
+TARGET_USER=""
+if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+    TARGET_USER="$SUDO_USER"
+elif [[ -n "${USER:-}" && "${USER}" != "root" ]]; then
+    TARGET_USER="$USER"
+fi
+
+if ! getent group docker >/dev/null 2>&1; then
+    groupadd --system docker
+fi
+
+if [[ -n "$TARGET_USER" ]] && id -u "$TARGET_USER" >/dev/null 2>&1; then
+    if id -nG "$TARGET_USER" | tr ' ' '\n' | grep -qx docker; then
+        echo ">> User '$TARGET_USER' is already in the docker group."
+    else
+        usermod -aG docker "$TARGET_USER"
+        echo ">> Added user '$TARGET_USER' to docker group. Re-login (or run: newgrp docker) to apply."
+    fi
+else
+    echo ">> Could not determine a non-root target user. Add a user manually with: usermod -aG docker <username>"
+fi
+
 # Report current Docker service state.
 if systemctl is-active docker >/dev/null 2>&1; then
     echo ">> Docker service is active."
