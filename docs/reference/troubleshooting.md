@@ -35,22 +35,6 @@ sudo groupadd -f seat
 sudo ./scripts/setup.sh
 ```
 
-### Failure: code-insiders install fails
-Symptoms:
-- Package not found or repository key/source errors
-
-Likely Causes:
-- Microsoft repo unreachable
-- keyring file missing or unreadable
-
-Troubleshooting:
-```bash
-ls -l /usr/share/keyrings/microsoft.gpg
-cat /etc/apt/sources.list.d/vscode.sources
-sudo apt-get update
-sudo apt-get install -y code-insiders
-```
-
 ### Failure: boot-time fixes do not rebuild
 Symptoms:
 - `update-initramfs` exits non-zero
@@ -346,6 +330,27 @@ Troubleshooting:
 sudo docker run hello-world
 sudo systemctl status docker --no-pager
 docker info
+```
+
+## scripts/install-vscode.sh
+
+### Failure: VS Code repository setup or install fails
+Symptoms:
+- Package not found or repository key/source errors
+- Errors during GPG key download or apt update
+
+Likely Causes:
+- Microsoft repository unreachable
+- Keyring file missing or unreadable
+- Network connectivity issues
+
+Troubleshooting:
+```bash
+ls -l /usr/share/keyrings/microsoft.gpg
+cat /etc/apt/sources.list.d/vscode.sources
+wget -qO- https://packages.microsoft.com/keys/microsoft.asc
+sudo apt-get update
+sudo apt-get install -y code-insiders
 ```
 
 ## scripts/install-labwc.sh

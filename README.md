@@ -86,7 +86,6 @@ chmod +x scripts/*.sh post-setup/hooks/*.sh
 - Installs system packages and enables services.
 - Disables `btusb` autosuspend, switches initramfs module policy to `MODULES=dep`, and rebuilds the current initramfs before rebooting.
 - Adds the invoking sudo user to `video`, `render`, and `seat` groups.
-- Installs `code-insiders` and its apt source.
 - Reboots automatically after a 5-second delay.
 
 `scripts/setup.sh` configures repositories, upgrades packages, installs core tooling, and configures services/users.
@@ -136,6 +135,7 @@ Current core hooks:
 - `post-setup/hooks/20-run-automount-disks.sh` — Run disk automount configuration.
 - `post-setup/hooks/30-install-docker.sh` — Install Docker from the official Docker apt repository.
 - `post-setup/hooks/40-install-labwc.sh` — Install labwc (package, source, or docker-package mode, chosen interactively or by environment variable).
+- `post-setup/hooks/50-install-vscode.sh` — Install VS Code Insiders from Microsoft's apt repository.
 
 Run:
 

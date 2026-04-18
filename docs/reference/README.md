@@ -18,6 +18,7 @@ Quick links:
 - [scripts/onboot-update.sh](script-contracts.md#scriptsonboot-updatesh) — 12-hour debounced updater
 - [scripts/automount-disks.sh](script-contracts.md#scriptsautomount-diskssh) — Detect and automount eligible EXT4/NTFS disks
 - [scripts/install-docker.sh](script-contracts.md#scriptsinstall-dockersh) — Install Docker from the official apt repository
+- [scripts/install-vscode.sh](script-contracts.md#scriptsinstall-vscodesh) — Install VS Code Insiders from Microsoft's apt repository
 - [scripts/install-labwc.sh](script-contracts.md#scriptsinstall-labwcsh) — Install labwc from package, source, or Docker-built package and deploy config
 - [systemd/onboot-update.service](script-contracts.md#systemdonboot-updateservice) — Service unit and hardening policy
 
@@ -26,6 +27,7 @@ Hooks:
 - [post-setup/hooks/20-run-automount-disks.sh](script-contracts.md#post-setup-hooks-20-run-automount-diskssh) — Run automount hook
 - [post-setup/hooks/30-install-docker.sh](script-contracts.md#post-setup-hooks-30-install-dockersh) — Run Docker install hook
 - [post-setup/hooks/40-install-labwc.sh](script-contracts.md#post-setup-hooks-40-install-labwcsh) — Run labwc install hook
+- [post-setup/hooks/50-install-vscode.sh](script-contracts.md#post-setup-hooks-50-install-vscodesh) — Run VS Code Insiders install hook
 
 ### "A script failed. How do I fix it?"
 
@@ -34,7 +36,6 @@ See the [Failure Modes & Troubleshooting](troubleshooting.md) reference, organiz
 **Stage 1 (Base Setup):**
 - [apt update/upgrade failures](troubleshooting.md#failure-apt-update-or-upgrade-fails)
 - [seat group already exists](troubleshooting.md#failure-seat-group-already-exists)
-- [code-insiders install problems](troubleshooting.md#failure-code-insiders-install-fails)
 - [boot-time fixes do not rebuild](troubleshooting.md#failure-boot-time-fixes-do-not-rebuild)
 
 **Stage 2 (Post-Setup Dispatcher):**
@@ -56,6 +57,9 @@ See the [Failure Modes & Troubleshooting](troubleshooting.md) reference, organiz
 - [repository setup or package install fails](troubleshooting.md#failure-docker-repository-setup-or-package-install-fails)
 - [Docker daemon is not running](troubleshooting.md#failure-docker-daemon-is-not-running)
 - [hello-world verification fails](troubleshooting.md#failure-docker-hello-world-verification-fails)
+
+**VS Code Installation:**
+- [repository setup or install fails](troubleshooting.md#failure-vs-code-repository-setup-or-install-fails)
 
 **Labwc Installation:**
 - [install-labwc rejects execution context](troubleshooting.md#failure-install-labwc-rejects-execution-context)
@@ -91,8 +95,10 @@ See the [Failure Modes & Troubleshooting](troubleshooting.md) reference, organiz
 | `post-setup/hooks/20-run-automount-disks.sh` | [link](script-contracts.md#post-setup-hooks-20-run-automount-diskssh) | | 2 |
 | `post-setup/hooks/30-install-docker.sh` | [link](script-contracts.md#post-setup-hooks-30-install-dockersh) | | 2 |
 | `post-setup/hooks/40-install-labwc.sh` | [link](script-contracts.md#post-setup-hooks-40-install-labwcsh) | | 2 |
+| `post-setup/hooks/50-install-vscode.sh` | [link](script-contracts.md#post-setup-hooks-50-install-vscodesh) | | 2 |
 | `scripts/automount-disks.sh` | [link](script-contracts.md#scriptsautomount-diskssh) | [link](troubleshooting.md#scriptsautomount-diskssh) | 2 |
 | `scripts/install-docker.sh` | [link](script-contracts.md#scriptsinstall-dockersh) | [link](troubleshooting.md#scriptsinstall-dockersh) | 2 |
+| `scripts/install-vscode.sh` | [link](script-contracts.md#scriptsinstall-vscodesh) | | 2 |
 | `scripts/install-labwc.sh` | [link](script-contracts.md#scriptsinstall-labwcsh) | [link](troubleshooting.md#scriptsinstall-labwcsh) | 2 |
 | `scripts/onboot-update.sh` | [link](script-contracts.md#scriptsonboot-updatesh) | [link](troubleshooting.md#scripts-onboot-updatesh-and-onboot-updateservice) | boot |
 | `systemd/onboot-update.service` | [link](script-contracts.md#systemdonboot-updateservice) | [link](troubleshooting.md#scripts-onboot-updatesh-and-onboot-updateservice) | boot |

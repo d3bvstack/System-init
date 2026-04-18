@@ -19,7 +19,7 @@ Inputs and Invocation:
 Required Environment:
 - Debian 13 (Trixie)
 - `apt-get`, `systemctl`, `wget`, `gpg`, `pam-auth-update`
-- Network connectivity to Debian and Microsoft package repositories
+- Network connectivity to Debian package repositories
 
 Note:
 - `initramfs-tools` is installed by the script before `update-initramfs` is invoked.
@@ -32,7 +32,6 @@ Side Effects:
 - Updates `/etc/initramfs-tools/initramfs.conf` to use `MODULES=dep`
 - Rebuilds the current initramfs with `update-initramfs`
 - Adds target user to `video`, `render`, and `seat`
-- Installs VS Code Insiders repository and package
 - Performs cleanup and triggers reboot
 
 Idempotency:
@@ -141,6 +140,47 @@ Side Effects:
 
 Idempotency:
 - Same idempotency profile as `scripts/install-labwc.sh`
+
+## post-setup/hooks/50-install-vscode.sh
+
+Purpose:
+Invoke VS Code Insiders installer script.
+
+Inputs and Invocation:
+- Executed by dispatcher as root
+- Requires repository file: `scripts/install-vscode.sh`
+
+Required Environment:
+- `bash`
+
+Side Effects:
+- Delegates all side effects to `scripts/install-vscode.sh`
+
+Idempotency:
+- Same idempotency profile as `scripts/install-vscode.sh`
+
+## scripts/install-vscode.sh
+
+Purpose:
+Install VS Code Insiders from Microsoft's apt repository.
+
+Inputs and Invocation:
+- Run as root via sudo from non-root account: `sudo ./scripts/install-vscode.sh`
+- Can also be invoked by post-setup hook
+
+Required Environment:
+- `wget`, `gpg`, `apt-get`
+- Network connectivity to Microsoft package repository
+
+Side Effects:
+- Downloads Microsoft GPG signing key and installs to `/usr/share/keyrings/microsoft.gpg`
+- Creates `/etc/apt/sources.list.d/vscode.sources` with Microsoft code repository
+- Runs `apt-get update`
+- Installs `code-insiders` package
+
+Idempotency:
+- Mostly idempotent (repository key regeneration and source file rewriting are safe)
+- Package install is idempotent
 
 ## scripts/install-labwc.sh
 

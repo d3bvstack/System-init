@@ -91,27 +91,6 @@ echo ">> Configuring PAM for Gnome Keyring..."
 sudo pam-auth-update --enable gnome-keyring
 # Keep shell profiles unchanged; keyring startup is handled by PAM sessions.
 
-# Install VS Code Insiders from Microsoft's apt repository.
-echo ">> Installing VS Code..."
-# Stream the repository key directly to the target keyring file.
-wget -qO- https://packages.microsoft.com/keys/microsoft.asc | \
-    gpg --dearmor | sudo tee /usr/share/keyrings/microsoft.gpg > /dev/null
-
-# Ensure apt can read the repository key.
-sudo chmod 644 /usr/share/keyrings/microsoft.gpg
-
-cat <<EOF | sudo tee /etc/apt/sources.list.d/vscode.sources > /dev/null
-Types: deb
-URIs: https://packages.microsoft.com/repos/code
-Suites: stable
-Components: main
-Architectures: amd64 arm64 armhf
-Signed-By: /usr/share/keyrings/microsoft.gpg
-EOF
-
-sudo apt-get update
-sudo apt-get install code-insiders -y
-
 # Remove no-longer-needed packages and clean apt cache.
 echo ">> Cleaning up..."
 sudo apt-get autoremove --purge -y
