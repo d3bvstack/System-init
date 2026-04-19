@@ -224,10 +224,10 @@ while IFS= read -r line; do
     # Build mount directory name from label when present, otherwise UUID.
     if [ -n "$LABEL" ]; then
         SAFE_LABEL=$(sanitize_mount_label "$LABEL")
-        MOUNT_DIR="/mnt/${SAFE_LABEL}-${UUID:0:8}"
+        MOUNT_DIR="/media/${SAFE_LABEL}-${UUID:0:8}"
     else
         SAFE_LABEL="disk_$(basename "$DEV")"
-        MOUNT_DIR="/mnt/${SAFE_LABEL}-${UUID:0:8}"
+        MOUNT_DIR="/media/${SAFE_LABEL}-${UUID:0:8}"
     fi
 
     # Only manage mounted devices when they are mounted at the expected path.
@@ -249,6 +249,7 @@ while IFS= read -r line; do
         fi
     fi
 
+    COMMON_OPTS="noatime,nofail,noauto,users,x-systemd.automount,x-systemd.idle-timeout=15min,x-gvfs-show"
     # Write filesystem-specific automount entries.
     if [[ "$FSTYPE" == "ext4" ]]; then
         if looks_like_linux_root "$DEV"; then
@@ -260,7 +261,7 @@ while IFS= read -r line; do
         mkdir -p "$MOUNT_DIR"
 
         # Mount on access, do not mount at boot, and unmount after idle timeout.
-        FSTAB_ENTRY="UUID=$UUID  $MOUNT_DIR  ext4  defaults,noatime,nofail,noauto,users,x-systemd.automount,x-systemd.idle-timeout=15min,x-gvfs-show,x-gvfs-name=$SAFE_LABEL  0  0"
+        FSTAB_ENTRY="UUID=$UUID  $MOUNT_DIR  ext4  defaults,$COMMON_OPTS  0  2"
         UPSERT_RESULT=$(upsert_fstab_entry "$UUID" "$FSTAB_ENTRY")
         # Ensure ext4 mount root ownership matches the invoking user each run.
         if ! set_ext4_mount_owner "$DEV" "$MOUNT_DIR" "$ACTUAL_UID" "$ACTUAL_GID"; then
@@ -270,17 +271,17 @@ while IFS= read -r line; do
             echo ">> ${UPSERT_RESULT^} /etc/fstab entry for UUID=$UUID."
         fi
 
-    elif [[ "$FSTYPE" == "ntfs" || "$FSTYPE" == "ntfs3" ]]; then
+    elif [[ "$FSTYPE" == "ntfs" || "$FSTYPE" == "ntfs3" || "$FSTYPE" == "ntfs-3g" ]]; then
         if [[ -z "$NTFS_FSTYPE" ]]; then
-            echo ">> Skipping $DEV - NTFS support is not available on this host."
+            echo ">> Skipping $DEV - no usable NTFS mount support detected."
             continue
         fi
 
         echo ">> Found NTFS drive on $DEV. Configuring automount..."
         mkdir -p "$MOUNT_DIR"
 
-        # Use the available NTFS driver and map file ownership to the target user.
-        FSTAB_ENTRY="UUID=$UUID  $MOUNT_DIR  $NTFS_FSTYPE  defaults,noatime,uid=$ACTUAL_UID,gid=$ACTUAL_GID,umask=022,nofail,noauto,x-systemd.automount,x-systemd.idle-timeout=15min,x-gvfs-show,x-gvfs-name=$SAFE_LABEL  0  0"
+        # Use the detected NTFS driver type and map file ownership to the target user.
+        FSTAB_ENTRY="UUID=$UUID  $MOUNT_DIR  $NTFS_FSTYPE  defaults,$COMMON_OPTS,uid=$ACTUAL_UID,gid=$ACTUAL_GID,umask=007  0  0"
         UPSERT_RESULT=$(upsert_fstab_entry "$UUID" "$FSTAB_ENTRY")
         if [[ "$UPSERT_RESULT" != "unchanged" ]]; then
             echo ">> ${UPSERT_RESULT^} /etc/fstab entry for UUID=$UUID."
@@ -288,12 +289,13 @@ while IFS= read -r line; do
     fi
 done < <(lsblk -n -p -P -o PATH,FSTYPE,UUID,LABEL,MOUNTPOINT)
 
+echo ">> Reloading systemd daemons..."
+systemctl daemon-reload
+systemctl restart local-fs.target
 if [[ "$CHANGES_APPLIED" -eq 1 ]]; then
-    # Reload systemd so it recognizes newly created automount units.
-    echo ">> Reloading systemd daemons..."
-    systemctl daemon-reload
+    echo ">> Reloaded systemd and restarted local-fs.target."
 else
-    echo ">> No /etc/fstab changes were required."
+    echo ">> No /etc/fstab changes were required. Systemd was reloaded and local-fs.target was restarted to ensure automount units are active."
 fi
 
 echo ">> Done! Your drives are now ready and will mount automatically upon access."
